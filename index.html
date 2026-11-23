@@ -1,0 +1,3094 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, interactive-widget=resizes-content" />
+  <title>Телефонний довідник</title>
+
+  <!-- PWA мета-теги -->
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#0b0f19" media="(prefers-color-scheme: dark)" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Довідник" />
+  <meta name="description" content="Автономний офлайн телефонний довідник РАЕС та сторонніх організацій" />
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="./icon.svg" />
+  <link rel="apple-touch-icon" href="./icon.svg" />
+
+  <style>
+    :root {
+      --bg: #f4f6f9;
+      --surface: #ffffff;
+      --surface-2: #f8fafc;
+      --surface-hover: #f1f5f9;
+      --border: #e2e8f0;
+      --border-soft: #eef2f6;
+      --text: #0f172a;
+      --text-sec: #475569;
+      --text-muted: #94a3b8;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --accent-soft: #eff6ff;
+      --accent-text: #1d4ed8;
+      --success-bg: #ecfdf5;
+      --success-text: #047857;
+      --danger: #e11d48;
+      --danger-soft: #fff1f2;
+      --warn: #f59e0b;
+      --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+      --shadow-dock: 0 -4px 20px rgba(15, 23, 42, 0.07);
+      --shadow-modal: 0 20px 45px rgba(15, 23, 42, 0.22);
+      --shadow-menu: 0 12px 32px rgba(15, 23, 42, 0.16);
+    }
+
+    html.dark {
+      --bg: #0b0f19;
+      --surface: #111827;
+      --surface-2: #161f32;
+      --surface-hover: #1e293b;
+      --border: #1f2937;
+      --border-soft: #182234;
+      --text: #f8fafc;
+      --text-sec: #cbd5e1;
+      --text-muted: #64748b;
+      --accent: #3b82f6;
+      --accent-hover: #60a5fa;
+      --accent-soft: rgba(59, 130, 246, 0.16);
+      --accent-text: #60a5fa;
+      --success-bg: rgba(16, 185, 129, 0.14);
+      --success-text: #34d399;
+      --danger: #fb7185;
+      --danger-soft: rgba(244, 63, 94, 0.15);
+      --warn: #fbbf24;
+      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.25);
+      --shadow-dock: 0 -6px 24px rgba(0, 0, 0, 0.45);
+      --shadow-modal: 0 24px 50px rgba(0, 0, 0, 0.6);
+      --shadow-menu: 0 16px 36px rgba(0, 0, 0, 0.55);
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Helvetica, Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.4;
+      transition: background-color 0.15s ease, color 0.15s ease;
+    }
+
+    button, input, label { font-family: inherit; }
+
+    /* Верхня мінімалістична шапка */
+    .top-header {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      background: color-mix(in srgb, var(--surface) 92%, transparent);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .container {
+      width: 100%;
+      max-width: 780px;
+      margin: 0 auto;
+      padding-left: 14px;
+      padding-right: 14px;
+    }
+
+    .header-inner {
+      height: 54px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .brand-title {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .offline-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      background: var(--success-bg);
+      color: var(--success-text);
+      flex-shrink: 0;
+    }
+
+    .offline-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .header-actions {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    /* Випадаюче меню у верхньому правому куті */
+    .header-menu-dropdown {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      width: 260px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 6px;
+      box-shadow: var(--shadow-menu);
+      z-index: 50;
+      animation: popIn 0.14s ease-out;
+    }
+
+    .menu-item {
+      width: 100%;
+      padding: 9px 11px;
+      border: none;
+      border-radius: 10px;
+      background: transparent;
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-align: left;
+      cursor: pointer;
+      transition: background 0.12s;
+    }
+    .menu-item:hover { background: var(--surface-hover); }
+    .menu-item.danger { color: var(--danger); }
+    .menu-item.danger:hover { background: var(--danger-soft); }
+
+    .menu-divider {
+      height: 1px;
+      background: var(--border-soft);
+      margin: 5px 4px;
+    }
+
+    .menu-version {
+      padding: 6px 11px 4px;
+      font-size: 11px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .btn-import {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      height: 34px;
+      padding: 0 12px;
+      border-radius: 10px;
+      background: var(--accent);
+      color: #ffffff;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .btn-import:hover { background: var(--accent-hover); }
+    .btn-import:active { transform: scale(0.97); }
+
+    .icon-btn {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-sec);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .icon-btn:hover { background: var(--surface-hover); color: var(--text); }
+
+    /* Основна область контенту з відступом під нижню панель */
+    .main-area {
+      flex: 1;
+      padding-top: 12px;
+      padding-bottom: 140px;
+    }
+
+    /* Нижня фіксована панель: Пошук + Навігація */
+    .bottom-dock {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 35;
+      background: color-mix(in srgb, var(--surface) 95%, transparent);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border-top: 1px solid var(--border);
+      box-shadow: var(--shadow-dock);
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    .dock-inner {
+      padding-top: 8px;
+      padding-bottom: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .search-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .search-box {
+      position: relative;
+      flex: 1;
+      display: flex;
+      align-items: center;
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 12px;
+      color: var(--text-muted);
+      pointer-events: none;
+      display: flex;
+    }
+
+    .search-input {
+      width: 100%;
+      height: 40px;
+      padding: 0 36px 0 36px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text);
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+    }
+
+    .search-input::placeholder { color: var(--text-muted); }
+    .search-input:focus {
+      background: var(--surface);
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+
+    .search-clear {
+      position: absolute;
+      right: 6px;
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 18px;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    .search-clear:hover { background: var(--surface-hover); color: var(--text); }
+
+    .btn-reset-search {
+      height: 40px;
+      padding: 0 11px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text-sec);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .btn-reset-search:hover { background: var(--surface-hover); color: var(--text); }
+
+    /* Нижні вкладки */
+    .nav-tabs {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4px;
+      padding: 3px;
+      border-radius: 12px;
+      background: var(--surface-2);
+      border: 1px solid var(--border-soft);
+    }
+
+    .nav-tab {
+      height: 34px;
+      border: none;
+      border-radius: 9px;
+      background: transparent;
+      color: var(--text-sec);
+      font-size: 12.5px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .nav-tab.active {
+      background: var(--surface);
+      color: var(--accent-text);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .tab-badge {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+    .nav-tab.active .tab-badge { color: var(--accent-text); opacity: 0.85; }
+
+    .toolbar-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+
+    .meta-pill {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-ghost {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-sec);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 5px 10px;
+      border-radius: 9px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: background 0.15s;
+    }
+    .btn-ghost:hover { background: var(--surface-hover); color: var(--text); }
+
+    /* Картки папок 1-го рівня */
+    .tree-stack { display: flex; flex-direction: column; gap: 8px; }
+
+    .folder-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .folder-header {
+      width: 100%;
+      padding: 12px 14px;
+      border: none;
+      background: transparent;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      text-align: left;
+      cursor: pointer;
+      transition: background 0.12s;
+    }
+    .folder-header:hover { background: var(--surface-hover); }
+
+    .folder-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+      flex: 1;
+    }
+
+    .chevron {
+      width: 16px;
+      height: 16px;
+      color: var(--text-muted);
+      flex-shrink: 0;
+      transition: transform 0.16s ease, color 0.16s ease;
+    }
+    .chevron.open {
+      transform: rotate(90deg);
+      color: var(--accent);
+    }
+
+    .folder-icon-wrap {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      background: var(--accent-soft);
+      color: var(--accent-text);
+    }
+
+    .folder-title {
+      font-size: 13.5px;
+      font-weight: 700;
+      line-height: 1.3;
+      color: var(--text);
+      word-break: break-word;
+    }
+
+    .folder-count {
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--text-muted);
+      background: var(--surface-2);
+      border: 1px solid var(--border-soft);
+      padding: 2px 8px;
+      border-radius: 999px;
+      flex-shrink: 0;
+    }
+
+    .folder-body {
+      border-top: 1px solid var(--border-soft);
+      display: block;
+    }
+
+    /* Вкладені відділи / підкатегорії (2-й рівень) */
+    .subdept-block {
+      border-top: 1px solid var(--border-soft);
+    }
+    .subdept-block:first-child { border-top: none; }
+
+    .subdept-header {
+      width: 100%;
+      padding: 10px 14px 10px 24px;
+      border: none;
+      background: var(--surface-2);
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      text-align: left;
+      cursor: pointer;
+      transition: background 0.12s;
+    }
+    .subdept-header:hover { background: var(--surface-hover); }
+
+    .subdept-title {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--text-sec);
+      line-height: 1.3;
+    }
+
+    .subdept-contacts {
+      border-left: 3px solid var(--accent-soft);
+      margin-left: 16px;
+    }
+
+    /* Рядок контакту */
+    .contact-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 11px 14px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border-soft);
+      transition: background 0.12s;
+    }
+    .contact-row:last-child { border-bottom: none; }
+    .contact-row:hover { background: var(--surface-2); }
+
+    .contact-info {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .contact-path {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-bottom: 3px;
+      line-height: 1.3;
+    }
+
+    .contact-name {
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--text);
+      line-height: 1.35;
+      word-break: break-word;
+    }
+
+    .contact-pos {
+      font-size: 12px;
+      color: var(--text-sec);
+      margin-top: 2px;
+      line-height: 1.35;
+      word-break: break-word;
+    }
+
+    .contact-room {
+      display: inline-block;
+      margin-top: 4px;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-muted);
+      background: var(--surface-2);
+      border: 1px solid var(--border-soft);
+      padding: 1px 7px;
+      border-radius: 6px;
+    }
+
+    .contact-actions {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-shrink: 0;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      max-width: 52%;
+    }
+
+    .phone-chip {
+      padding: 5px 9px;
+      border-radius: 9px;
+      border: 1px solid transparent;
+      background: var(--accent-soft);
+      color: var(--accent-text);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      cursor: pointer;
+      text-align: right;
+      word-break: break-word;
+      transition: transform 0.1s, filter 0.12s;
+    }
+    .phone-chip:hover { filter: brightness(0.95); }
+    .phone-chip:active { transform: scale(0.96); }
+
+    .mini-act-btn {
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.12s, color 0.12s;
+    }
+    .mini-act-btn:hover { background: var(--surface-hover); color: var(--text); }
+    .mini-act-btn.call:hover { color: var(--success-text); }
+    .mini-act-btn.fav-active { color: var(--warn); }
+
+    mark.hl {
+      background: #fef08a;
+      color: #0f172a;
+      padding: 0 2px;
+      border-radius: 3px;
+      font-weight: 700;
+    }
+    html.dark mark.hl {
+      background: #ca8a04;
+      color: #ffffff;
+    }
+
+    /* Порожні стани */
+    .empty-card {
+      margin: 28px auto;
+      max-width: 420px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 28px 22px;
+      text-align: center;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .empty-title {
+      margin: 0 0 8px;
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .empty-desc {
+      margin: 0 0 18px;
+      font-size: 12.5px;
+      color: var(--text-sec);
+      line-height: 1.5;
+    }
+
+    .btn-primary-full {
+      width: 100%;
+      height: 40px;
+      border-radius: 12px;
+      border: none;
+      background: var(--accent);
+      color: #ffffff;
+      font-size: 13.5px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    .btn-primary-full:hover { background: var(--accent-hover); }
+
+    /* Модальні вікна */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 60;
+      background: rgba(15, 23, 42, 0.55);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .modal-card {
+      width: 100%;
+      max-width: 400px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 18px;
+      box-shadow: var(--shadow-modal);
+      animation: popIn 0.15s ease-out;
+    }
+
+    @keyframes popIn {
+      from { opacity: 0; transform: scale(0.96) translateY(6px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    .modal-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .modal-title {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .modal-close {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 20px;
+      cursor: pointer;
+    }
+    .modal-close:hover { background: var(--surface-hover); color: var(--text); }
+
+    .text-input {
+      width: 100%;
+      height: 38px;
+      padding: 0 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text);
+      font-size: 13.5px;
+      outline: none;
+    }
+    .text-input:focus {
+      border-color: var(--accent);
+      background: var(--surface);
+    }
+
+    .color-grid {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 12px 0;
+    }
+
+    .color-swatch {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: transform 0.12s;
+    }
+    .color-swatch.selected {
+      transform: scale(1.15);
+      box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--text);
+    }
+
+    .folder-pick-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 240px;
+      overflow-y: auto;
+      margin-bottom: 12px;
+    }
+
+    .folder-pick-item {
+      width: 100%;
+      padding: 9px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      text-align: left;
+    }
+    .folder-pick-item:hover { background: var(--surface-hover); }
+    .folder-pick-item.current {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+      color: var(--accent-text);
+    }
+
+    .toast {
+      position: fixed;
+      top: 66px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-6px);
+      z-index: 70;
+      padding: 8px 16px;
+      border-radius: 999px;
+      background: var(--text);
+      color: var(--surface);
+      font-size: 12.5px;
+      font-weight: 600;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.16s, transform 0.16s;
+      white-space: nowrap;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .loading-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 80;
+      background: rgba(15, 23, 42, 0.45);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .loading-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px 24px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      box-shadow: var(--shadow-modal);
+      font-size: 13.5px;
+      font-weight: 600;
+    }
+
+    .spinner {
+      width: 22px;
+      height: 22px;
+      border: 2.5px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+  <!-- ВЕРХНЯ КОМПАКТНА ШАПКА -->
+  <header class="top-header">
+    <div class="container header-inner">
+      <div class="brand">
+        <h1 class="brand-title">Телефонний довідник</h1>
+        <span class="offline-badge" title="Додаток і база працюють автономно без інтернету">
+          <span class="offline-dot"></span>
+          <span>Офлайн</span>
+        </span>
+      </div>
+
+      <div class="header-actions" id="header-menu-wrap">
+        <input type="file" id="excel-input" accept=".xlsx" class="hidden" />
+        <input type="file" id="backup-input" accept=".json,application/json" class="hidden" />
+
+        <button
+          id="menu-toggle-btn"
+          class="icon-btn"
+          title="Меню"
+          aria-label="Меню"
+          aria-expanded="false"
+        >
+          <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24">
+            <circle cx="12" cy="5" r="2"></circle>
+            <circle cx="12" cy="12" r="2"></circle>
+            <circle cx="12" cy="19" r="2"></circle>
+          </svg>
+        </button>
+
+        <div id="header-menu-dropdown" class="header-menu-dropdown hidden" role="menu">
+          <label for="excel-input" class="menu-item" role="menuitem" onclick="closeHeaderMenu()">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+            </svg>
+            <span>Імпортувати Excel (.xlsx)</span>
+          </label>
+
+          <button type="button" class="menu-item" role="menuitem" data-menu-action="new-fav-folder">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 10.5v6m3-3H9m4.06-7.19l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+            </svg>
+            <span>Створити папку в Обраному</span>
+          </button>
+
+          <button type="button" class="menu-item" role="menuitem" data-menu-action="toggle-all-folders">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12" />
+            </svg>
+            <span id="menu-expand-label">Розгорнути / Згорнути всі</span>
+          </button>
+
+          <button type="button" class="menu-item" role="menuitem" data-menu-action="toggle-theme">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" />
+            </svg>
+            <span id="menu-theme-label">Темна / Світла тема</span>
+          </button>
+
+          <button type="button" class="menu-item" role="menuitem" data-menu-action="install-pwa">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" />
+            </svg>
+            <span id="menu-install-label">Встановити додаток</span>
+          </button>
+
+          <div class="menu-divider"></div>
+
+          <button type="button" class="menu-item" role="menuitem" data-menu-action="export-backup">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+            </svg>
+            <span>Створити резервну копію</span>
+          </button>
+
+          <label for="backup-input" class="menu-item" role="menuitem" onclick="closeHeaderMenu()">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+            </svg>
+            <span>Відновити з резерву</span>
+          </label>
+
+          <div class="menu-divider"></div>
+
+          <button type="button" class="menu-item danger" role="menuitem" data-menu-action="ask-clear-db">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+            </svg>
+            <span>Очистити базу даних</span>
+          </button>
+
+          <div class="menu-divider"></div>
+          <div class="menu-version">
+            <span>Телефонний довідник</span>
+            <span>v1.6.0</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ОСНОВНА ОБЛАСТЬ КОНТЕНТУ -->
+  <main class="container main-area">
+    <div id="app-content"></div>
+  </main>
+
+  <!-- НИЖНЯ ПАНЕЛЬ УПРАВЛІННЯ: ПОШУК + ВКЛАДКИ -->
+  <div class="bottom-dock">
+    <div class="container dock-inner">
+      <div class="search-row">
+        <div class="search-box">
+          <span class="search-icon">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.1" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+            </svg>
+          </span>
+          <input
+            type="text"
+            id="search-input"
+            class="search-input"
+            autocomplete="off"
+            placeholder="Пошук: П.І.Б., телефон, посада, кабінет, цех..."
+          />
+          <button
+            id="search-clear-btn"
+            class="search-clear hidden"
+            type="button"
+            title="Очистити поле"
+            aria-label="Очистити поле"
+          >×</button>
+        </div>
+        <button
+          id="search-reset-btn"
+          class="btn-reset-search hidden"
+          type="button"
+          title="Скинути пошук"
+        >Скинути</button>
+      </div>
+
+      <nav class="nav-tabs" id="tabs-bar">
+        <button class="nav-tab active" data-tab="raes">
+          <span>РАЕС</span>
+          <span class="tab-badge" id="tab-count-raes"></span>
+        </button>
+        <button class="nav-tab" data-tab="external">
+          <span>Сторонні</span>
+          <span class="tab-badge" id="tab-count-ext"></span>
+        </button>
+        <button class="nav-tab" data-tab="favorites">
+          <span>Обране</span>
+          <span class="tab-badge" id="tab-count-fav"></span>
+        </button>
+      </nav>
+    </div>
+  </div>
+
+  <!-- МОДАЛЬНЕ ВІКНО: ВИБІР ПАПКИ ДЛЯ КОНТАКТУ -->
+  <div id="assign-modal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 class="modal-title" id="assign-modal-title">Додати в Обране</h3>
+        <button class="modal-close" type="button" data-close-modal="assign-modal">×</button>
+      </div>
+      <div id="assign-contact-preview" style="font-size:12px; color:var(--text-sec); margin-bottom:12px;"></div>
+      <div class="folder-pick-list" id="assign-folder-list"></div>
+
+      <div style="border-top:1px solid var(--border-soft); padding-top:10px; display:flex; gap:6px;">
+        <input type="text" id="quick-folder-name" class="text-input" placeholder="Нова папка..." />
+        <button type="button" id="quick-folder-create-btn" class="btn-import" style="height:38px; flex-shrink:0;">Створити</button>
+      </div>
+      <div id="assign-remove-wrap" style="margin-top:10px; text-align:center;"></div>
+    </div>
+  </div>
+
+  <!-- МОДАЛЬНЕ ВІКНО: СТВОРЕННЯ / РЕДАГУВАННЯ ПАПКИ -->
+  <div id="folder-modal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 class="modal-title" id="folder-modal-title">Нова папка</h3>
+        <button class="modal-close" type="button" data-close-modal="folder-modal">×</button>
+      </div>
+      <input type="text" id="folder-name-input" class="text-input" placeholder="Назва папки (напр. Керівництво, Аварійні)" />
+      <div class="color-grid" id="folder-color-grid"></div>
+      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:14px;">
+        <button type="button" data-close-modal="folder-modal" class="btn-ghost">Скасувати</button>
+        <button type="button" id="save-folder-btn" class="btn-import">Зберегти</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- МОДАЛЬНЕ ВІКНО: ПІДТВЕРДЖЕННЯ ОЧИЩЕННЯ БАЗИ -->
+  <div id="confirm-clear-modal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 class="modal-title">Очистити базу даних?</h3>
+        <button class="modal-close" type="button" data-close-modal="confirm-clear-modal">×</button>
+      </div>
+      <p style="margin:0 0 16px; font-size:13px; color:var(--text-sec); line-height:1.45;">
+        Усі імпортовані контакти РАЕС та сторонніх організацій буде видалено з пристрою. Папки та контакти в «Обраному» залишаться збереженими.
+      </p>
+      <div style="display:flex; justify-content:flex-end; gap:8px;">
+        <button type="button" data-close-modal="confirm-clear-modal" class="btn-ghost">Скасувати</button>
+        <button type="button" id="confirm-clear-btn" class="btn-import" style="background:var(--danger);">Очистити</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- МОДАЛЬНЕ ВІКНО: ВСТАНОВЛЕННЯ ДОДАТКУ -->
+  <div id="install-pwa-modal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 class="modal-title">Встановити додаток на пристрій</h3>
+        <button class="modal-close" type="button" data-close-modal="install-pwa-modal">×</button>
+      </div>
+      <div id="install-pwa-body" style="font-size:13px; color:var(--text-sec); line-height:1.5; margin-bottom:14px;">
+        <p style="margin:0 0 8px;"><strong>Android (Chrome / Edge):</strong> натисніть меню браузера <strong>⋮</strong> у правому верхньому куті та оберіть <strong>«Встановити додаток»</strong> або <strong>«Додати на головний екран»</strong>.</p>
+        <p style="margin:0;"><strong>iPhone / iPad (Safari):</strong> натисніть кнопку <strong>«Поділитися»</strong> (квадрат зі стрілкою вгору) та виберіть <strong>«На початковий екран»</strong>.</p>
+      </div>
+      <div style="display:flex; justify-content:flex-end;">
+        <button type="button" data-close-modal="install-pwa-modal" class="btn-import">Зрозуміло</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ОВЕРЛЕЙ ЗАВАНТАЖЕННЯ -->
+  <div id="loading-overlay" class="loading-overlay hidden">
+    <div class="loading-box">
+      <div class="spinner"></div>
+      <span id="loading-text">Обробка файлу Excel...</span>
+    </div>
+  </div>
+
+  <!-- TOAST -->
+  <div id="toast" class="toast">Скопійовано</div>
+
+  <script>
+    const APP_VERSION = '1.6.0';
+
+    /**
+     * =========================================================================
+     * 1. ВБУДОВАНИЙ 100% ОФЛАЙН ПАРСЕР .XLSX
+     * =========================================================================
+     */
+    const OfflineXLSX = {
+      readUint64LE(view, offset) {
+        const lo = view.getUint32(offset, true);
+        const hi = view.getUint32(offset + 4, true);
+        return hi * 4294967296 + lo;
+      },
+
+      async unzip(arrayBuffer) {
+        const bytes = new Uint8Array(arrayBuffer);
+        const view = new DataView(arrayBuffer);
+
+        let eocdOffset = -1;
+        const minOffset = Math.max(0, bytes.length - 65557);
+        for (let i = bytes.length - 22; i >= minOffset; i--) {
+          if (view.getUint32(i, true) === 0x06054b50) {
+            eocdOffset = i;
+            break;
+          }
+        }
+        if (eocdOffset === -1) {
+          throw new Error('Некоректний формат .xlsx (не знайдено ZIP-структуру).');
+        }
+
+        let totalEntries = view.getUint16(eocdOffset + 10, true);
+        let centralDirOffset = view.getUint32(eocdOffset + 16, true);
+
+        if (totalEntries === 0xFFFF || centralDirOffset === 0xFFFFFFFF) {
+          const locOffset = eocdOffset - 20;
+          if (locOffset >= 0 && view.getUint32(locOffset, true) === 0x07064b50) {
+            const z64EocdOffset = this.readUint64LE(view, locOffset + 8);
+            if (z64EocdOffset + 56 <= bytes.length && view.getUint32(z64EocdOffset, true) === 0x06064b50) {
+              totalEntries = this.readUint64LE(view, z64EocdOffset + 32);
+              centralDirOffset = this.readUint64LE(view, z64EocdOffset + 48);
+            }
+          }
+        }
+
+        const files = new Map();
+        const decoder = new TextDecoder('utf-8');
+        let ptr = centralDirOffset;
+
+        for (let i = 0; i < totalEntries; i++) {
+          if (ptr + 46 > bytes.length || view.getUint32(ptr, true) !== 0x02014b50) break;
+
+          const compression = view.getUint16(ptr + 10, true);
+          let compressedSize = view.getUint32(ptr + 20, true);
+          let uncompressedSize = view.getUint32(ptr + 24, true);
+          const fileNameLen = view.getUint16(ptr + 28, true);
+          const extraLen = view.getUint16(ptr + 30, true);
+          const commentLen = view.getUint16(ptr + 32, true);
+          let localHeaderOffset = view.getUint32(ptr + 42, true);
+
+          const fileName = decoder.decode(bytes.subarray(ptr + 46, ptr + 46 + fileNameLen));
+
+          if (compressedSize === 0xFFFFFFFF || uncompressedSize === 0xFFFFFFFF || localHeaderOffset === 0xFFFFFFFF) {
+            let exPtr = ptr + 46 + fileNameLen;
+            const exEnd = exPtr + extraLen;
+            while (exPtr + 4 <= exEnd) {
+              const headerId = view.getUint16(exPtr, true);
+              const dataSize = view.getUint16(exPtr + 2, true);
+              if (headerId === 0x0001) {
+                let fieldPtr = exPtr + 4;
+                if (uncompressedSize === 0xFFFFFFFF && fieldPtr + 8 <= exPtr + 4 + dataSize) {
+                  uncompressedSize = this.readUint64LE(view, fieldPtr);
+                  fieldPtr += 8;
+                }
+                if (compressedSize === 0xFFFFFFFF && fieldPtr + 8 <= exPtr + 4 + dataSize) {
+                  compressedSize = this.readUint64LE(view, fieldPtr);
+                  fieldPtr += 8;
+                }
+                if (localHeaderOffset === 0xFFFFFFFF && fieldPtr + 8 <= exPtr + 4 + dataSize) {
+                  localHeaderOffset = this.readUint64LE(view, fieldPtr);
+                }
+                break;
+              }
+              exPtr += 4 + dataSize;
+            }
+          }
+
+          ptr += 46 + fileNameLen + extraLen + commentLen;
+
+          if (fileName.endsWith('/')) continue;
+          if (localHeaderOffset + 30 > bytes.length || view.getUint32(localHeaderOffset, true) !== 0x04034b50) continue;
+
+          const localNameLen = view.getUint16(localHeaderOffset + 26, true);
+          const localExtraLen = view.getUint16(localHeaderOffset + 28, true);
+          const dataStart = localHeaderOffset + 30 + localNameLen + localExtraLen;
+          const dataEnd = Math.min(bytes.length, dataStart + compressedSize);
+          const compressedData = bytes.subarray(dataStart, dataEnd);
+
+          if (compression === 0) {
+            files.set(fileName, compressedData);
+          } else if (compression === 8) {
+            const ds = new DecompressionStream('deflate-raw');
+            const writer = ds.writable.getWriter();
+            const writePromise = writer.write(compressedData).then(() => writer.close());
+            const readPromise = new Response(ds.readable).arrayBuffer();
+            const [, decompressedBuf] = await Promise.all([writePromise, readPromise]);
+            files.set(fileName, new Uint8Array(decompressedBuf));
+          }
+        }
+        return files;
+      },
+
+      decodeXml(uint8Arr) {
+        if (!uint8Arr) return null;
+        const xmlText = new TextDecoder('utf-8').decode(uint8Arr);
+        return new DOMParser().parseFromString(xmlText, 'application/xml');
+      },
+
+      parseCellRef(ref) {
+        const clean = String(ref || '').replace(/\$/g, '').trim();
+        let col = 0;
+        let i = 0;
+        const len = clean.length;
+        while (i < len) {
+          const code = clean.charCodeAt(i);
+          if (code >= 65 && code <= 90) {
+            col = col * 26 + (code - 64);
+            i++;
+          } else if (code >= 97 && code <= 122) {
+            col = col * 26 + (code - 96);
+            i++;
+          } else {
+            break;
+          }
+        }
+        const row = parseInt(clean.slice(i), 10) - 1;
+        return { row: row >= 0 ? row : 0, col: col > 0 ? col - 1 : 0 };
+      },
+
+      parseRangeRef(rangeStr) {
+        const colonIdx = rangeStr.indexOf(':');
+        if (colonIdx === -1) {
+          const s = this.parseCellRef(rangeStr);
+          return { s, e: { row: s.row, col: s.col } };
+        }
+        const s = this.parseCellRef(rangeStr.slice(0, colonIdx));
+        const e = this.parseCellRef(rangeStr.slice(colonIdx + 1));
+        return {
+          s: { row: Math.min(s.row, e.row), col: Math.min(s.col, e.col) },
+          e: { row: Math.max(s.row, e.row), col: Math.max(s.col, e.col) }
+        };
+      },
+
+      parseSharedStrings(doc) {
+        if (!doc) return [];
+        const siNodes = doc.getElementsByTagName('si');
+        const len = siNodes.length;
+        const list = new Array(len);
+        for (let i = 0; i < len; i++) {
+          const tNodes = siNodes[i].getElementsByTagName('t');
+          if (tNodes.length === 1) {
+            list[i] = tNodes[0].textContent || '';
+          } else {
+            let text = '';
+            for (let j = 0; j < tNodes.length; j++) {
+              text += tNodes[j].textContent || '';
+            }
+            list[i] = text;
+          }
+        }
+        return list;
+      },
+
+      parseGrayStyleIndices(stylesDoc) {
+        const grayXfSet = new Set();
+        if (!stylesDoc) return grayXfSet;
+
+        const grayFillIds = new Set();
+        const fills = stylesDoc.getElementsByTagName('fill');
+
+        for (let i = 0; i < fills.length; i++) {
+          const patternFill = fills[i].getElementsByTagName('patternFill')[0];
+          if (!patternFill) continue;
+          const patternType = (patternFill.getAttribute('patternType') || '').toLowerCase();
+          if (!patternType || patternType === 'none') continue;
+          if (i === 1 && patternType === 'gray125') continue;
+
+          const fgColor = patternFill.getElementsByTagName('fgColor')[0];
+          const bgColor = patternFill.getElementsByTagName('bgColor')[0];
+
+          const hasVisibleFillColor = (node) => {
+            if (!node) return false;
+            const rgb = node.getAttribute('rgb');
+            if (rgb) {
+              let hex = rgb.trim().toUpperCase();
+              if (hex.length === 8) hex = hex.slice(2);
+              if (hex === 'FFFFFF' || hex === '000000') return false;
+              if (hex.length === 6) {
+                const r = parseInt(hex.slice(0, 2), 16);
+                const g = parseInt(hex.slice(2, 4), 16);
+                const b = parseInt(hex.slice(4, 6), 16);
+                if (!isNaN(r) && !isNaN(g) && !isNaN(b)) {
+                  return !(r > 248 && g > 248 && b > 248);
+                }
+              }
+            }
+            const indexed = node.getAttribute('indexed');
+            if (indexed !== null && indexed !== '64' && indexed !== '65' && indexed !== '9') {
+              return true;
+            }
+            const theme = node.getAttribute('theme');
+            if (theme !== null) {
+              const tint = parseFloat(node.getAttribute('tint') || '0');
+              if (theme === '0' && tint === 0) return false;
+              return true;
+            }
+            return false;
+          };
+
+          if (hasVisibleFillColor(fgColor) || hasVisibleFillColor(bgColor) || patternType === 'solid') {
+            const fgRgb = (fgColor?.getAttribute('rgb') || '').toUpperCase();
+            if (!fgRgb.endsWith('FFFFFF')) {
+              grayFillIds.add(i);
+            }
+          }
+        }
+
+        const cellXfs = stylesDoc.getElementsByTagName('cellXfs')[0];
+        if (cellXfs) {
+          const xfs = cellXfs.getElementsByTagName('xf');
+          for (let i = 0; i < xfs.length; i++) {
+            const fillId = parseInt(xfs[i].getAttribute('fillId') || '-1', 10);
+            if (grayFillIds.has(fillId)) {
+              grayXfSet.add(i);
+            }
+          }
+        }
+
+        return grayXfSet;
+      },
+
+      async readWorkbook(arrayBuffer) {
+        const files = await this.unzip(arrayBuffer);
+
+        const wbDoc = this.decodeXml(files.get('xl/workbook.xml'));
+        const relsDoc = this.decodeXml(files.get('xl/_rels/workbook.xml.rels'));
+        const ssDoc = this.decodeXml(files.get('xl/sharedStrings.xml'));
+        const stylesDoc = this.decodeXml(files.get('xl/styles.xml'));
+
+        if (!wbDoc) throw new Error('Не знайдено xl/workbook.xml всередині файлу.');
+
+        const sharedStrings = this.parseSharedStrings(ssDoc);
+        const grayStyleIndices = this.parseGrayStyleIndices(stylesDoc);
+
+        const relMap = new Map();
+        if (relsDoc) {
+          const rels = relsDoc.getElementsByTagName('Relationship');
+          for (let i = 0; i < rels.length; i++) {
+            const id = rels[i].getAttribute('Id');
+            let target = rels[i].getAttribute('Target') || '';
+            if (target.startsWith('/')) target = target.slice(1);
+            if (!target.startsWith('xl/')) target = 'xl/' + target;
+            relMap.set(id, target);
+          }
+        }
+
+        const sheetNodes = wbDoc.getElementsByTagName('sheet');
+        const sheets = [];
+
+        for (let i = 0; i < sheetNodes.length; i++) {
+          const name = sheetNodes[i].getAttribute('name') || `Sheet${i + 1}`;
+          const rId = sheetNodes[i].getAttribute('r:id') ||
+            sheetNodes[i].getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id');
+          const sheetPath = relMap.get(rId) || `xl/worksheets/sheet${i + 1}.xml`;
+          const sheetDoc = this.decodeXml(files.get(sheetPath));
+          if (!sheetDoc) continue;
+
+          const merges = [];
+          const mergeNodes = sheetDoc.getElementsByTagName('mergeCell');
+          for (let m = 0; m < mergeNodes.length; m++) {
+            const ref = mergeNodes[m].getAttribute('ref');
+            if (ref) merges.push(this.parseRangeRef(ref));
+          }
+
+          const rowsMap = new Map();
+          const rowNodes = sheetDoc.getElementsByTagName('row');
+          let maxRow = 0;
+
+          for (let rIdx = 0; rIdx < rowNodes.length; rIdx++) {
+            const rowNode = rowNodes[rIdx];
+            const rAttr = rowNode.getAttribute('r');
+            const currentRow = rAttr ? (parseInt(rAttr, 10) - 1) : rIdx;
+            if (currentRow > maxRow) maxRow = currentRow;
+
+            const cNodes = rowNode.getElementsByTagName('c');
+            if (cNodes.length === 0) continue;
+
+            let rowCells = rowsMap.get(currentRow);
+            if (!rowCells) {
+              rowCells = new Map();
+              rowsMap.set(currentRow, rowCells);
+            }
+
+            let autoCol = 0;
+            for (let c = 0; c < cNodes.length; c++) {
+              const cNode = cNodes[c];
+              const ref = cNode.getAttribute('r');
+              let col = autoCol;
+              if (ref) {
+                col = this.parseCellRef(ref).col;
+              }
+              autoCol = col + 1;
+
+              if (col > 4) continue;
+
+              const t = cNode.getAttribute('t');
+              const sAttr = cNode.getAttribute('s');
+              const styleIdx = sAttr !== null ? parseInt(sAttr, 10) : -1;
+              const isGray = grayStyleIndices.has(styleIdx);
+
+              let val = '';
+              if (t === 's') {
+                const vNode = cNode.getElementsByTagName('v')[0];
+                if (vNode) {
+                  const idx = parseInt(vNode.textContent || '0', 10);
+                  val = sharedStrings[idx] !== undefined ? sharedStrings[idx] : '';
+                }
+              } else if (t === 'inlineStr') {
+                const tNodes = cNode.getElementsByTagName('t');
+                for (let j = 0; j < tNodes.length; j++) {
+                  val += tNodes[j].textContent || '';
+                }
+              } else {
+                const vNode = cNode.getElementsByTagName('v')[0];
+                if (vNode && vNode.textContent !== null) {
+                  val = vNode.textContent;
+                  if (/^-?\d+\.0+$/.test(val)) {
+                    val = val.replace(/\.0+$/, '');
+                  }
+                }
+              }
+
+              rowCells.set(col, {
+                value: String(val).trim(),
+                isGray
+              });
+            }
+          }
+
+          // Гарантуємо, що maxRow охоплює також нижні межі об'єднаних комірок
+          for (let m = 0; m < merges.length; m++) {
+            if (merges[m].e.row > maxRow) maxRow = merges[m].e.row;
+          }
+
+          sheets.push({ name, rowsMap, merges, maxRow });
+        }
+
+        return { sheets };
+      }
+    };
+
+    /**
+     * =========================================================================
+     * 2. ПАРСИНГ АРКУШІВ «РАЕС» ТА «СТОРОННІ ОРГАНІЗАЦІЇ»
+     *    З ПІДТРИМКОЮ ОБ'ЄДНАНИХ НОМЕРІВ ТЕЛЕФОНІВ (C26:C28) ТА ПРИМІЩЕНЬ (D12:D13)
+     * =========================================================================
+     */
+    function normalizePhone(val) {
+      return String(val || '').replace(/[\s\-\(\)\+\.,;]/g, '').toLowerCase();
+    }
+
+    function cleanNumberTrailingZero(str) {
+      return String(str || '').replace(/(\d+)\.0+/g, '$1').trim();
+    }
+
+    function isHeaderRow(a, b, c) {
+      const s = `${a} ${b} ${c}`.toLowerCase();
+      return (
+        (s.includes('посад') && (s.includes('п.і.б') || s.includes('піб') || s.includes('телефон'))) ||
+        (s.includes('телефон') && s.includes('кабінет'))
+      );
+    }
+
+    function buildStableContactKey(source, parts) {
+      const raw = [source, ...parts]
+        .map(p => String(p || '').toLowerCase().replace(/\s+/g, ' ').trim())
+        .join('|');
+      let h = 2166136261;
+      for (let i = 0; i < raw.length; i++) {
+        h ^= raw.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+      }
+      return `${source}_${(h >>> 0).toString(36)}`;
+    }
+
+    /**
+     * Успадкування значень для вертикально та прямокутно об'єднаних комірок
+     * (наприклад C26:C28 спільний телефон, D12:D13 або D26:D28 спільне приміщення).
+     */
+    function applyMergeInheritance(rowsMap, merges, targetCols) {
+      for (let i = 0; i < merges.length; i++) {
+        const m = merges[i];
+        // Пропускаємо горизонтальні заголовки підрозділів/відділів A:C / A:D
+        if (m.s.r === m.e.r && m.s.c === 0 && m.e.c >= 2) continue;
+        if (m.e.r <= m.s.r) continue;
+
+        for (let col = m.s.c; col <= m.e.c; col++) {
+          if (!targetCols.includes(col)) continue;
+
+          // Шукаємо перше непорожнє значення в межах об'єднаного блоку
+          let sourceCell = null;
+          for (let sr = m.s.r; sr <= m.e.r; sr++) {
+            const candidate = rowsMap.get(sr)?.get(col);
+            if (candidate && candidate.value !== '') {
+              sourceCell = candidate;
+              break;
+            }
+          }
+
+          if (sourceCell) {
+            for (let r = m.s.r; r <= m.e.r; r++) {
+              let rowCells = rowsMap.get(r);
+              if (!rowCells) {
+                rowCells = new Map();
+                rowsMap.set(r, rowCells);
+              }
+              const existing = rowCells.get(col);
+              if (!existing || existing.value === '') {
+                rowCells.set(col, { value: sourceCell.value, isGray: sourceCell.isGray });
+              }
+            }
+          }
+        }
+      }
+    }
+
+    function rowHasGrayFill(rowCells) {
+      for (let c = 0; c <= 3; c++) {
+        if (rowCells.get(c)?.isGray) return true;
+      }
+      return false;
+    }
+
+    function parseRaesSheetData(sheet) {
+      if (!sheet) return [];
+      const { rowsMap, merges, maxRow } = sheet;
+
+      // Колонки C (index 2 — телефон) і D (index 3 — кабінет) успадковують значення об'єднаних комірок
+      applyMergeInheritance(rowsMap, merges, [2, 3]);
+
+      const horizMergeByRow = new Map();
+      for (let i = 0; i < merges.length; i++) {
+        const m = merges[i];
+        if (m.s.r === m.e.r && m.s.c === 0 && m.e.c >= 2) {
+          horizMergeByRow.set(m.s.r, m);
+        }
+      }
+
+      const contacts = [];
+      let currentSubdivision = 'Загальні підрозділи РАЕС';
+      let currentDepartment = '';
+      const dupCounter = new Map();
+
+      for (let r = 0; r <= maxRow; r++) {
+        const rowCells = rowsMap.get(r);
+        if (!rowCells) continue;
+
+        const valA = cleanNumberTrailingZero(rowCells.get(0)?.value || '');
+        const valB = cleanNumberTrailingZero(rowCells.get(1)?.value || '');
+        const valC = cleanNumberTrailingZero(rowCells.get(2)?.value || '');
+        const valD = cleanNumberTrailingZero(rowCells.get(3)?.value || '');
+
+        if (!valA && !valB && !valC && !valD) continue;
+        if (isHeaderRow(valA, valB, valC)) continue;
+
+        const hMerge = horizMergeByRow.get(r);
+        const isGray = rowHasGrayFill(rowCells);
+
+        if ((hMerge && valA) || (!hMerge && valA && !valB && !valC && !valD)) {
+          const cleanTitle = valA.replace(/\s+/g, ' ').trim();
+          if (isGray) {
+            currentSubdivision = cleanTitle;
+            currentDepartment = '';
+          } else {
+            currentDepartment = cleanTitle;
+          }
+          continue;
+        }
+
+        if (valA || valB || valC) {
+          const baseKey = buildStableContactKey('raes', [currentSubdivision, currentDepartment, valA, valB, valC, valD]);
+          const seenCount = (dupCounter.get(baseKey) || 0) + 1;
+          dupCounter.set(baseKey, seenCount);
+          const id = seenCount > 1 ? `${baseKey}_${seenCount}` : baseKey;
+
+          contacts.push({
+            id,
+            source: 'raes',
+            subdivision: currentSubdivision,
+            department: currentDepartment,
+            position: valA,
+            name: valB,
+            phone: valC,
+            phoneClean: normalizePhone(valC),
+            room: valD
+          });
+        }
+      }
+
+      return contacts;
+    }
+
+    function parseExternalSheetData(sheet) {
+      if (!sheet) return [];
+      const { rowsMap, merges, maxRow } = sheet;
+
+      applyMergeInheritance(rowsMap, merges, [2]);
+
+      const horizMergeByRow = new Map();
+      for (let i = 0; i < merges.length; i++) {
+        const m = merges[i];
+        if (m.s.r === m.e.r && m.s.c === 0 && m.e.c >= 2) {
+          horizMergeByRow.set(m.s.r, m);
+        }
+      }
+
+      const contacts = [];
+      let currentOrg = 'Сторонні організації';
+      let currentSubcat = '';
+      const dupCounter = new Map();
+
+      for (let r = 0; r <= maxRow; r++) {
+        const rowCells = rowsMap.get(r);
+        if (!rowCells) continue;
+
+        const valA = cleanNumberTrailingZero(rowCells.get(0)?.value || '');
+        const valB = cleanNumberTrailingZero(rowCells.get(1)?.value || '');
+        const valC = cleanNumberTrailingZero(rowCells.get(2)?.value || '');
+
+        if (!valA && !valB && !valC) continue;
+        if (isHeaderRow(valA, valB, valC)) continue;
+
+        const hMerge = horizMergeByRow.get(r);
+        const isGray = rowHasGrayFill(rowCells);
+
+        if ((hMerge && valA) || (!hMerge && valA && !valB && !valC)) {
+          const cleanTitle = valA.replace(/\s+/g, ' ').trim();
+          if (isGray) {
+            currentOrg = cleanTitle;
+            currentSubcat = '';
+          } else {
+            currentSubcat = cleanTitle;
+          }
+          continue;
+        }
+
+        const lines = valA.split(/
+?
+/).map(l => l.trim()).filter(Boolean);
+        const title = lines[0] || valB || 'Контакт';
+        const details = lines.slice(1).join(' • ') || (lines[0] && valB ? valB : '');
+        const phone = valC || valB;
+
+        if (title || phone) {
+          const baseKey = buildStableContactKey('ext', [currentOrg, currentSubcat, title, details, phone]);
+          const seenCount = (dupCounter.get(baseKey) || 0) + 1;
+          dupCounter.set(baseKey, seenCount);
+          const id = seenCount > 1 ? `${baseKey}_${seenCount}` : baseKey;
+
+          contacts.push({
+            id,
+            source: 'external',
+            org: currentOrg,
+            subcat: currentSubcat,
+            title,
+            details,
+            phone,
+            phoneClean: normalizePhone(phone)
+          });
+        }
+      }
+
+      return contacts;
+    }
+
+    /**
+     * =========================================================================
+     * 3. INDEXEDDB + LOCALSTORAGE РЕЗЕРВНЕ ЗБЕРЕЖЕННЯ (100% ОФЛАЙН)
+     * =========================================================================
+     */
+    const DB_NAME = 'RaesPhonebookOfflineV4';
+    const DB_VERSION = 1;
+    const STORE_NAME = 'kv';
+
+    function openIDB() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, DB_VERSION);
+        req.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains(STORE_NAME)) {
+            db.createObjectStore(STORE_NAME);
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    async function storageGet(key) {
+      try {
+        const db = await openIDB();
+        const val = await new Promise((resolve, reject) => {
+          const tx = db.transaction(STORE_NAME, 'readonly');
+          const req = tx.objectStore(STORE_NAME).get(key);
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error);
+        });
+        if (val !== undefined && val !== null) return val;
+      } catch {}
+
+      try {
+        const raw = localStorage.getItem('fallback_' + key);
+        return raw ? JSON.parse(raw) : null;
+      } catch {
+        return null;
+      }
+    }
+
+    async function storageSet(key, value) {
+      try {
+        const db = await openIDB();
+        await new Promise((resolve, reject) => {
+          const tx = db.transaction(STORE_NAME, 'readwrite');
+          tx.objectStore(STORE_NAME).put(value, key);
+          tx.oncomplete = () => resolve(true);
+          tx.onerror = () => reject(tx.error);
+        });
+      } catch {}
+
+      try {
+        localStorage.setItem('fallback_' + key, JSON.stringify(value));
+      } catch {}
+    }
+
+    /**
+     * =========================================================================
+     * 4. СТАН ДОДАТКУ, БЕЗПЕЧНІ ID ПАПОК ТА РЕЗЕРВНЕ КОПІЮВАННЯ
+     * =========================================================================
+     */
+    const FOLDER_COLORS = [
+      '#2563eb', '#059669', '#d97706', '#e11d48', '#7c3aed', '#0891b2', '#475569'
+    ];
+
+    const state = {
+      db: {
+        raes: [],
+        external: []
+      },
+      favData: {
+        folders: [],
+        items: []
+      },
+      tab: 'raes',
+      query: '',
+      searchLimit: 120,
+      nodeKeyToId: new Map(),
+      nodeIdToKey: new Map(),
+      nodeIdCounter: 0,
+      expandedNodes: new Set(),
+      expandedFavFolders: new Set(['__root__']),
+      contactsById: new Map(),
+      assigningContactId: null,
+      editingFolderId: null,
+      selectedFolderColor: FOLDER_COLORS[0]
+    };
+
+    function getSafeNodeId(rawKey) {
+      if (state.nodeKeyToId.has(rawKey)) {
+        return state.nodeKeyToId.get(rawKey);
+      }
+      const id = 'n_' + (++state.nodeIdCounter);
+      state.nodeKeyToId.set(rawKey, id);
+      state.nodeIdToKey.set(id, rawKey);
+      return id;
+    }
+
+    function rebuildContactIndex() {
+      const map = new Map();
+      for (let i = 0; i < state.db.raes.length; i++) {
+        map.set(state.db.raes[i].id, state.db.raes[i]);
+      }
+      for (let i = 0; i < state.db.external.length; i++) {
+        map.set(state.db.external[i].id, state.db.external[i]);
+      }
+      state.contactsById = map;
+    }
+
+    async function persistFavorites() {
+      await storageSet('fav_data_v4', state.favData);
+    }
+
+    function getFavEntry(contactId) {
+      return state.favData.items.find(i => i.contactId === contactId) || null;
+    }
+
+    function setLoading(show, text = 'Обробка файлу Excel...') {
+      const overlay = document.getElementById('loading-overlay');
+      const label = document.getElementById('loading-text');
+      if (text) label.textContent = text;
+      overlay.classList.toggle('hidden', !show);
+    }
+
+    let deferredInstallPrompt = null;
+
+    function scrollPageToTopImmediate() {
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    }
+
+    function ensureSearchResultsVisible() {
+      scrollPageToTopImmediate();
+      const firstCard = document.querySelector('#app-content .contact-row');
+      if (firstCard) {
+        const rect = firstCard.getBoundingClientRect();
+        if (rect.top < 54 || rect.bottom > window.innerHeight - 110) {
+          firstCard.scrollIntoView({ block: 'start', behavior: 'instant' });
+          window.scrollBy(0, -64);
+        }
+      }
+    }
+
+    async function triggerPwaInstall() {
+      if (deferredInstallPrompt) {
+        try {
+          deferredInstallPrompt.prompt();
+          const choice = await deferredInstallPrompt.userChoice;
+          if (choice && choice.outcome === 'accepted') {
+            showToast('Додаток встановлюється...');
+          }
+          deferredInstallPrompt = null;
+          return;
+        } catch (err) {
+          console.warn(err);
+        }
+      }
+      document.getElementById('install-pwa-modal').classList.remove('hidden');
+    }
+
+    async function onFileSelected(event) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      event.target.value = '';
+      closeHeaderMenu();
+
+      if (!file.name.toLowerCase().endsWith('.xlsx')) {
+        showToast('Оберіть файл у форматі .xlsx');
+        return;
+      }
+
+      // Негайне синхронне захоплення буфера (вирішує NotReadableError на Android)
+      const bufferPromise = file.arrayBuffer();
+      setLoading(true, 'Читання файлу Excel...');
+
+      try {
+        const buffer = await bufferPromise;
+        const workbook = await OfflineXLSX.readWorkbook(buffer);
+
+        const raesSheet = workbook.sheets.find(s => s.name.trim().toUpperCase() === 'РАЕС')
+          || workbook.sheets.find(s => s.name.toLowerCase().includes('раес'))
+          || workbook.sheets[0];
+
+        let extSheet = workbook.sheets.find(s => {
+          const low = s.name.toLowerCase();
+          return low.includes('оронн') || low.includes('орган');
+        });
+        if (extSheet === raesSheet && workbook.sheets.length > 1) {
+          extSheet = workbook.sheets[1];
+        }
+
+        const raesContacts = parseRaesSheetData(raesSheet);
+        const extContacts = parseExternalSheetData(extSheet);
+
+        if (raesContacts.length === 0 && extContacts.length === 0) {
+          setLoading(false);
+          showToast('У файлі не знайдено контактів');
+          return;
+        }
+
+        state.db = {
+          raes: raesContacts,
+          external: extContacts
+        };
+        rebuildContactIndex();
+
+        for (const favItem of state.favData.items) {
+          if (state.contactsById.has(favItem.contactId)) {
+            favItem.snapshot = state.contactsById.get(favItem.contactId);
+          }
+        }
+        await persistFavorites();
+
+        state.expandedNodes.clear();
+        state.nodeKeyToId.clear();
+        state.nodeIdToKey.clear();
+        state.nodeIdCounter = 0;
+
+        await storageSet('phonebook_db_v4', state.db);
+        setLoading(false);
+        render();
+        scrollPageToTopImmediate();
+        showToast(`Імпортовано: РАЕС (${raesContacts.length}), Сторонні (${extContacts.length})`);
+      } catch (err) {
+        console.error(err);
+        setLoading(false);
+        showToast('Помилка читання .xlsx: ' + err.message);
+      }
+    }
+
+    /**
+     * Створення резервної копії (.json) та відновлення з резерву
+     */
+    function exportBackup() {
+      const payload = {
+        app: 'RaesPhonebookPWA',
+        version: APP_VERSION,
+        exportedAt: new Date().toISOString(),
+        db: state.db,
+        favData: state.favData
+      };
+
+      const jsonStr = JSON.stringify(payload, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+
+      const now = new Date();
+      const dateStamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Довідник_резерв_${dateStamp}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+
+      showToast('Резервну копію збережено');
+    }
+
+    async function onBackupFileSelected(event) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      event.target.value = '';
+      closeHeaderMenu();
+
+      const textPromise = file.text();
+      setLoading(true, 'Відновлення з резервної копії...');
+
+      try {
+        const rawText = await textPromise;
+        const parsed = JSON.parse(rawText);
+
+        if (!parsed || typeof parsed !== 'object' || (!parsed.db && !parsed.favData)) {
+          throw new Error('Невірний формат файлу резервної копії');
+        }
+
+        if (parsed.db && (Array.isArray(parsed.db.raes) || Array.isArray(parsed.db.external))) {
+          state.db = {
+            raes: Array.isArray(parsed.db.raes) ? parsed.db.raes : [],
+            external: Array.isArray(parsed.db.external) ? parsed.db.external : []
+          };
+          rebuildContactIndex();
+          await storageSet('phonebook_db_v4', state.db);
+        }
+
+        if (parsed.favData && Array.isArray(parsed.favData.items)) {
+          state.favData = {
+            folders: Array.isArray(parsed.favData.folders) ? parsed.favData.folders : [],
+            items: parsed.favData.items
+          };
+          await persistFavorites();
+        }
+
+        state.expandedNodes.clear();
+        state.nodeKeyToId.clear();
+        state.nodeIdToKey.clear();
+        state.nodeIdCounter = 0;
+
+        setLoading(false);
+        render();
+        scrollPageToTopImmediate();
+        showToast(`Відновлено: РАЕС (${state.db.raes.length}), Сторонні (${state.db.external.length}), Обране (${state.favData.items.length})`);
+      } catch (err) {
+        console.error(err);
+        setLoading(false);
+        showToast('Помилка відновлення: ' + err.message);
+      }
+    }
+
+    async function loadDemoData() {
+      const raesDemo = [
+        { subdivision: 'Бухгалтерія', department: '', position: 'Головний бухгалтер', name: 'Шепель Ольга Леонідівна', phone: '64111', room: 'ВЛК, прим. 334' },
+        { subdivision: 'Бухгалтерія', department: 'Відділ обліку запасів та необоротних активів', position: 'Бухгалтер І категорії', name: 'Мельник Олена Василівна', phone: '64111', room: 'ВЛК, прим. 127' },
+        { subdivision: 'Бухгалтерія', department: 'Відділ обліку запасів та необоротних активів', position: 'Бухгалтер ІІ категорії', name: 'Ковалець Наталія Вікторівна', phone: '64111', room: 'ВЛК, прим. 127' },
+        { subdivision: 'Бухгалтерія', department: "Відділ обліку об'єктів соціальної інфраструктури", position: 'Бухгалтер І категорії', name: 'Савчук Ірина Петрівна', phone: '64131', room: 'АПК-2, прим. 205' },
+        { subdivision: 'Бухгалтерія', department: "Відділ обліку об'єктів соціальної інфраструктури", position: 'Бухгалтер', name: 'Ткачук Марія Іванівна', phone: '64131', room: 'АПК-2, прим. 205' },
+        { subdivision: 'Бухгалтерія', department: "Відділ обліку об'єктів соціальної інфраструктури", position: 'Бухгалтер', name: 'Демчук Оксана Сергіївна', phone: '64131', room: 'АПК-2, прим. 205' }
+      ].map((r, idx) => ({
+        ...r,
+        id: buildStableContactKey('raes', [r.subdivision, r.department, r.position, r.name, r.phone, idx]),
+        source: 'raes',
+        phoneClean: normalizePhone(r.phone)
+      }));
+
+      const extDemo = [
+        { org: '2 ДПРЗ ГУ ДСНС України у Рівненській області з охорони об’єктів', subcat: 'Керівництво', title: 'Начальник загону — полковник служби ЦЗ Ковальчук В.М.', details: 'Приймальня • Цілодобово', phone: '101, 64301' },
+        { org: '2 ДПРЗ ГУ ДСНС України у Рівненській області з охорони об’єктів', subcat: 'Пункт зв’язку частини', title: 'Диспетчер оперативно-диспетчерської служби', details: 'Черговий караул', phone: '64302' }
+      ].map((e, idx) => ({
+        ...e,
+        id: buildStableContactKey('ext', [e.org, e.subcat, e.title, e.details, e.phone, idx]),
+        source: 'external',
+        phoneClean: normalizePhone(e.phone)
+      }));
+
+      state.db = { raes: raesDemo, external: extDemo };
+      rebuildContactIndex();
+      await storageSet('phonebook_db_v4', state.db);
+      render();
+      showToast('Тестові дані завантажено');
+    }
+
+    async function clearDatabase() {
+      state.db = { raes: [], external: [] };
+      rebuildContactIndex();
+      state.expandedNodes.clear();
+      state.nodeKeyToId.clear();
+      state.nodeIdToKey.clear();
+      state.nodeIdCounter = 0;
+      await storageSet('phonebook_db_v4', state.db);
+      closeModal('confirm-clear-modal');
+      render();
+      showToast('Базу даних очищено');
+    }
+
+    /**
+     * =========================================================================
+     * 5. УПРАВЛІННЯ ОБРАНИМ ТА КОРИСТУВАЦЬКИМИ ПАПКАМИ
+     * =========================================================================
+     */
+    async function toggleStarQuick(contactId) {
+      const existing = getFavEntry(contactId);
+      if (existing) {
+        openAssignModal(contactId);
+      } else {
+        const contact = state.contactsById.get(contactId);
+        if (!contact) return;
+        state.favData.items.push({
+          contactId,
+          folderId: '',
+          snapshot: contact
+        });
+        await persistFavorites();
+        render();
+        showToast('Додано в Обране ★');
+      }
+    }
+
+    function openAssignModal(contactId) {
+      const contact = state.contactsById.get(contactId) || getFavEntry(contactId)?.snapshot;
+      if (!contact) return;
+
+      state.assigningContactId = contactId;
+      const existing = getFavEntry(contactId);
+      const currentFolderId = existing ? (existing.folderId || '') : null;
+
+      document.getElementById('assign-modal-title').textContent = existing ? 'Папка в Обраному' : 'Додати в Обране';
+      const displayName = contact.source === 'raes' ? (contact.name || contact.position) : contact.title;
+      document.getElementById('assign-contact-preview').textContent = `${displayName}${contact.phone ? ' • ' + contact.phone : ''}`;
+
+      const listEl = document.getElementById('assign-folder-list');
+      const folders = [
+        { id: '', name: 'Без папки (Загальні)', color: '#64748b' },
+        ...state.favData.folders
+      ];
+
+      listEl.innerHTML = folders.map(f => {
+        const isCurrent = currentFolderId === f.id;
+        return `
+          <button type="button" class="folder-pick-item ${isCurrent ? 'current' : ''}" data-assign-folder="${esc(f.id)}">
+            <span style="display:flex; align-items:center; gap:8px;">
+              <span style="width:10px; height:10px; border-radius:50%; background:${f.color || '#2563eb'}; display:inline-block;"></span>
+              <span>${esc(f.name)}</span>
+            </span>
+            <span>${isCurrent ? '✓' : '+'}</span>
+          </button>
+        `;
+      }).join('');
+
+      const removeWrap = document.getElementById('assign-remove-wrap');
+      removeWrap.innerHTML = existing
+        ? `<button type="button" data-remove-fav="${esc(contactId)}" class="btn-ghost" style="color:var(--danger); border-color:var(--danger-soft); width:100%; justify-content:center;">Видалити з Обраного</button>`
+        : '';
+
+      document.getElementById('quick-folder-name').value = '';
+      document.getElementById('assign-modal').classList.remove('hidden');
+    }
+
+    function closeModal(modalId) {
+      document.getElementById(modalId)?.classList.add('hidden');
+      if (modalId === 'assign-modal') state.assigningContactId = null;
+      if (modalId === 'folder-modal') state.editingFolderId = null;
+    }
+
+    async function assignContactToFolder(folderId) {
+      const contactId = state.assigningContactId;
+      if (!contactId) return;
+
+      const contact = state.contactsById.get(contactId) || getFavEntry(contactId)?.snapshot;
+      if (!contact) return;
+
+      const idx = state.favData.items.findIndex(i => i.contactId === contactId);
+      if (idx >= 0) {
+        state.favData.items[idx].folderId = folderId;
+        state.favData.items[idx].snapshot = contact;
+      } else {
+        state.favData.items.push({
+          contactId,
+          folderId,
+          snapshot: contact
+        });
+      }
+
+      state.expandedFavFolders.add(folderId || '__root__');
+      await persistFavorites();
+      closeModal('assign-modal');
+      render();
+      const folderName = folderId
+        ? (state.favData.folders.find(f => f.id === folderId)?.name || 'папку')
+        : 'Загальні';
+      showToast(`Збережено в «${folderName}»`);
+    }
+
+    async function createFolderAndAssign() {
+      const input = document.getElementById('quick-folder-name');
+      const name = input.value.trim();
+      if (!name) {
+        showToast('Введіть назву папки');
+        return;
+      }
+      const newFolder = {
+        id: 'fld_' + Date.now().toString(36),
+        name,
+        color: FOLDER_COLORS[state.favData.folders.length % FOLDER_COLORS.length]
+      };
+      state.favData.folders.push(newFolder);
+      await assignContactToFolder(newFolder.id);
+    }
+
+    async function removeFromFavorites(contactId) {
+      state.favData.items = state.favData.items.filter(i => i.contactId !== contactId);
+      await persistFavorites();
+      closeModal('assign-modal');
+      render();
+      showToast('Видалено з Обраного');
+    }
+
+    async function moveFavItem(contactId, direction) {
+      const idx = state.favData.items.findIndex(i => i.contactId === contactId);
+      if (idx < 0) return;
+      const folderId = state.favData.items[idx].folderId || '';
+
+      const sameFolderIndices = [];
+      state.favData.items.forEach((item, i) => {
+        if ((item.folderId || '') === folderId) sameFolderIndices.push(i);
+      });
+
+      const posInFolder = sameFolderIndices.indexOf(idx);
+      const targetPos = posInFolder + direction;
+      if (targetPos < 0 || targetPos >= sameFolderIndices.length) return;
+
+      const swapIdx = sameFolderIndices[targetPos];
+      const temp = state.favData.items[idx];
+      state.favData.items[idx] = state.favData.items[swapIdx];
+      state.favData.items[swapIdx] = temp;
+
+      await persistFavorites();
+      render();
+    }
+
+    function openFolderModal(folderId = null) {
+      state.editingFolderId = folderId;
+      const existing = folderId ? state.favData.folders.find(f => f.id === folderId) : null;
+
+      document.getElementById('folder-modal-title').textContent = existing ? 'Редагувати папку' : 'Нова папка';
+      const input = document.getElementById('folder-name-input');
+      input.value = existing ? existing.name : '';
+      state.selectedFolderColor = existing ? existing.color : FOLDER_COLORS[0];
+
+      renderFolderColors();
+      document.getElementById('folder-modal').classList.remove('hidden');
+      setTimeout(() => input.focus(), 50);
+    }
+
+    function renderFolderColors() {
+      const grid = document.getElementById('folder-color-grid');
+      grid.innerHTML = FOLDER_COLORS.map(c => `
+        <button
+          type="button"
+          class="color-swatch ${state.selectedFolderColor === c ? 'selected' : ''}"
+          style="background:${c};"
+          data-pick-color="${c}"
+        ></button>
+      `).join('');
+    }
+
+    async function saveFolderModal() {
+      const name = document.getElementById('folder-name-input').value.trim();
+      if (!name) {
+        showToast('Введіть назву папки');
+        return;
+      }
+
+      if (state.editingFolderId) {
+        const fld = state.favData.folders.find(f => f.id === state.editingFolderId);
+        if (fld) {
+          fld.name = name;
+          fld.color = state.selectedFolderColor;
+        }
+        showToast('Папку оновлено');
+      } else {
+        const newFld = {
+          id: 'fld_' + Date.now().toString(36),
+          name,
+          color: state.selectedFolderColor
+        };
+        state.favData.folders.push(newFld);
+        state.expandedFavFolders.add(newFld.id);
+        showToast('Папку створено');
+      }
+
+      await persistFavorites();
+      closeModal('folder-modal');
+      render();
+    }
+
+    async function deleteFavFolder(folderId) {
+      for (const item of state.favData.items) {
+        if (item.folderId === folderId) {
+          item.folderId = '';
+        }
+      }
+      state.favData.folders = state.favData.folders.filter(f => f.id !== folderId);
+      state.expandedFavFolders.add('__root__');
+      await persistFavorites();
+      render();
+      showToast('Папку видалено, контакти перенесено в «Без папки»');
+    }
+
+    /**
+     * =========================================================================
+     * 6. ДОПОМІЖНІ ФУНКЦІЇ UI
+     * =========================================================================
+     */
+    function esc(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function hl(text, query) {
+      const safe = esc(text);
+      if (!query || !query.trim() || !safe) return safe;
+      const q = query.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      try {
+        return safe.replace(new RegExp(`(${q})`, 'gi'), '<mark class="hl">$1</mark>');
+      } catch {
+        return safe;
+      }
+    }
+
+    function copyText(text) {
+      const val = String(text || '').trim();
+      if (!val) return;
+
+      const ta = document.createElement('textarea');
+      ta.value = val;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+        showToast(`Скопійовано: ${val}`);
+      } catch {
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(val).then(() => showToast(`Скопійовано: ${val}`));
+        }
+      }
+      document.body.removeChild(ta);
+    }
+
+    let toastTimer = null;
+    function showToast(msg) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => el.classList.remove('show'), 1900);
+    }
+
+    function closeHeaderMenu() {
+      const dd = document.getElementById('header-menu-dropdown');
+      const btn = document.getElementById('menu-toggle-btn');
+      if (dd && !dd.classList.contains('hidden')) {
+        dd.classList.add('hidden');
+        btn?.setAttribute('aria-expanded', 'false');
+      }
+    }
+
+    function toggleHeaderMenu() {
+      const dd = document.getElementById('header-menu-dropdown');
+      const btn = document.getElementById('menu-toggle-btn');
+      const isHidden = dd.classList.toggle('hidden');
+      btn.setAttribute('aria-expanded', String(!isHidden));
+    }
+
+    /**
+     * =========================================================================
+     * 7. РЕНДЕР КАРТОК КОНТАКТІВ ТА ТРЬОХ РОЗДІЛІВ
+     * =========================================================================
+     */
+    function renderContactRow(item, opts = {}) {
+      const { query = '', showPath = false, favControls = false } = opts;
+      const favEntry = getFavEntry(item.id);
+      const isFav = Boolean(favEntry);
+
+      const firstPhone = (item.phone || '').split(/[,;]/)[0].trim();
+      const telUri = firstPhone ? `tel:${firstPhone.replace(/[^\d+]/g, '')}` : '';
+
+      const pathParts = item.source === 'raes'
+        ? [item.subdivision, item.department].filter(Boolean)
+        : [item.org, item.subcat].filter(Boolean);
+
+      const primaryTitle = item.source === 'raes'
+        ? (item.name || item.position || '—')
+        : (item.title || '—');
+
+      const secondarySubtitle = item.source === 'raes'
+        ? (item.name && item.position ? item.position : '')
+        : (item.details || '');
+
+      return `
+        <div class="contact-row">
+          <div class="contact-info">
+            ${showPath && pathParts.length ? `
+              <div class="contact-path">
+                ${pathParts.map(p => hl(p, query)).join(' → ')}
+              </div>
+            ` : ''}
+
+            <div class="contact-name">${hl(primaryTitle, query)}</div>
+
+            ${secondarySubtitle ? `
+              <div class="contact-pos">${hl(secondarySubtitle, query)}</div>
+            ` : ''}
+
+            ${item.room ? `
+              <span class="contact-room">Кабінет ${hl(item.room, query)}</span>
+            ` : ''}
+          </div>
+
+          <div class="contact-actions">
+            ${item.phone ? `
+              <button
+                type="button"
+                class="phone-chip"
+                data-copy-phone="${esc(item.phone)}"
+                title="Скопіювати номер"
+              >${hl(item.phone, query)}</button>
+              <a
+                href="${telUri}"
+                class="mini-act-btn call"
+                title="Зателефонувати"
+              >
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
+                </svg>
+              </a>
+            ` : ''}
+
+            ${favControls ? `
+              <button type="button" class="mini-act-btn" data-fav-move="-1" data-cid="${esc(item.id)}" title="Вгору">↑</button>
+              <button type="button" class="mini-act-btn" data-fav-move="1" data-cid="${esc(item.id)}" title="Вниз">↓</button>
+              <button type="button" class="mini-act-btn" data-open-assign="${esc(item.id)}" title="Перемістити в іншу папку">
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+                </svg>
+              </button>
+            ` : `
+              <button
+                type="button"
+                class="mini-act-btn"
+                data-open-assign="${esc(item.id)}"
+                title="Обрати папку в Обраному"
+              >
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 10.5v6m3-3H9m4.06-7.19l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+                </svg>
+              </button>
+            `}
+
+            <button
+              type="button"
+              class="mini-act-btn ${isFav ? 'fav-active' : ''}"
+              data-toggle-star="${esc(item.id)}"
+              title="${isFav ? 'В Обраному (натисніть для керування)' : 'Додати в Обране'}"
+            >
+              <svg width="17" height="17" fill="${isFav ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderWelcomeEmpty() {
+      return `
+        <div class="empty-card">
+          <h2 class="empty-title">База довідника ще порожня</h2>
+          <p class="empty-desc">
+            Відкрийте меню <strong>⋮</strong> у правому верхньому куті та оберіть «Імпортувати Excel (.xlsx)» або відновіть дані з резервної копії.
+          </p>
+          <label for="excel-input" class="btn-primary-full">Завантажити Excel-файл (.xlsx)</label>
+          <button type="button" id="load-demo-btn" class="btn-ghost" style="margin-top:10px; width:100%; justify-content:center;">
+            Завантажити тестові дані
+          </button>
+        </div>
+      `;
+    }
+
+    /**
+     * Дворівневе дерево: якщо в підрозділі є відділи, співробітники основного розділу
+     * автоматично переносяться в підпапку «Загальний».
+     */
+    function buildTwoLevelGroups(items, scopePrefix, level1Key, level2Key) {
+      const tree = new Map();
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        const l1 = item[level1Key] || 'Загальний розділ';
+        const l2 = item[level2Key] || '';
+        if (!tree.has(l1)) {
+          const l1NodeId = getSafeNodeId(`${scopePrefix}::L1::${l1}`);
+          tree.set(l1, { id: l1NodeId, name: l1, direct: [], children: new Map(), total: 0 });
+        }
+        const node = tree.get(l1);
+        node.total++;
+        if (!l2) {
+          node.direct.push(item);
+        } else {
+          if (!node.children.has(l2)) {
+            const l2NodeId = getSafeNodeId(`${scopePrefix}::L2::${l1}::${l2}`);
+            node.children.set(l2, { id: l2NodeId, name: l2, items: [] });
+          }
+          node.children.get(l2).items.push(item);
+        }
+      }
+
+      const result = [];
+      for (const node of tree.values()) {
+        if (node.children.size > 0 && node.direct.length > 0) {
+          const generalId = getSafeNodeId(`${scopePrefix}::L2::${node.name}::__ЗАГАЛЬНИЙ__`);
+          const mergedChildren = new Map();
+          mergedChildren.set('Загальний', {
+            id: generalId,
+            name: 'Загальний',
+            items: node.direct
+          });
+          for (const [k, v] of node.children.entries()) {
+            mergedChildren.set(k, v);
+          }
+          node.children = mergedChildren;
+          node.direct = [];
+        }
+        result.push(node);
+      }
+
+      return result;
+    }
+
+    function renderTwoLevelTree({ items, scopePrefix, level1Key, level2Key, emptyText }) {
+      if (items.length === 0) {
+        return `<div class="empty-card"><p class="empty-desc" style="margin:0;">${emptyText}</p></div>`;
+      }
+
+      const groups = buildTwoLevelGroups(items, scopePrefix, level1Key, level2Key);
+
+      const cardsHtml = groups.map(group => {
+        const isL1Open = state.expandedNodes.has(group.id);
+
+        let bodyHtml = '';
+        if (isL1Open) {
+          const directHtml = group.direct.length > 0
+            ? `<div>${group.direct.map(c => renderContactRow(c)).join('')}</div>`
+            : '';
+
+          const childrenHtml = Array.from(group.children.values()).map(sub => {
+            const isL2Open = state.expandedNodes.has(sub.id);
+
+            return `
+              <div class="subdept-block">
+                <button type="button" class="subdept-header" data-toggle-node="${sub.id}">
+                  <div class="folder-left">
+                    <svg class="chevron ${isL2Open ? 'open' : ''}" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                    </svg>
+                    <span class="subdept-title">${esc(sub.name)}</span>
+                  </div>
+                  <span class="folder-count">${sub.items.length}</span>
+                </button>
+                ${isL2Open ? `
+                  <div class="subdept-contacts">
+                    ${sub.items.map(c => renderContactRow(c)).join('')}
+                  </div>
+                ` : ''}
+              </div>
+            `;
+          }).join('');
+
+          bodyHtml = `<div class="folder-body">${directHtml}${childrenHtml}</div>`;
+        }
+
+        return `
+          <div class="folder-card">
+            <button type="button" class="folder-header" data-toggle-node="${group.id}">
+              <div class="folder-left">
+                <svg class="chevron ${isL1Open ? 'open' : ''}" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                </svg>
+                <span class="folder-icon-wrap">
+                  <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+                  </svg>
+                </span>
+                <span class="folder-title">${esc(group.name)}</span>
+              </div>
+              <span class="folder-count">${group.total}</span>
+            </button>
+            ${bodyHtml}
+          </div>
+        `;
+      }).join('');
+
+      return `<div class="tree-stack">${cardsHtml}</div>`;
+    }
+
+    function renderFavoritesTab() {
+      const resolvedItems = state.favData.items
+        .map(entry => {
+          const contact = state.contactsById.get(entry.contactId) || entry.snapshot;
+          return contact ? { folderId: entry.folderId || '', contact } : null;
+        })
+        .filter(Boolean);
+
+      const toolbarHtml = `
+        <div class="toolbar-row">
+          <span class="meta-pill">Папок: ${state.favData.folders.length} • Контактів: ${resolvedItems.length}</span>
+          <button type="button" class="btn-import" style="height:32px; font-size:12px;" data-open-folder-modal="">+ Нова папка</button>
+        </div>
+      `;
+
+      if (resolvedItems.length === 0 && state.favData.folders.length === 0) {
+        return `
+          ${toolbarHtml}
+          <div class="empty-card">
+            <h3 class="empty-title">В Обраному поки порожньо</h3>
+            <p class="empty-desc">
+              Натисніть зірочку ★ біля будь-якого контакту або створіть власні папки для швидкого доступу до важливих номерів.
+            </p>
+            <button type="button" class="btn-primary-full" data-open-folder-modal="">+ Створити першу папку</button>
+          </div>
+        `;
+      }
+
+      const sections = [
+        ...state.favData.folders.map(f => ({
+          id: f.id,
+          key: f.id,
+          name: f.name,
+          color: f.color || '#2563eb',
+          isCustom: true,
+          contacts: resolvedItems.filter(x => x.folderId === f.id).map(x => x.contact)
+        })),
+        {
+          id: '',
+          key: '__root__',
+          name: 'Без папки (Загальні)',
+          color: '#64748b',
+          isCustom: false,
+          contacts: resolvedItems.filter(x => !x.folderId).map(x => x.contact)
+        }
+      ].filter(sec => sec.isCustom || sec.contacts.length > 0);
+
+      const foldersHtml = sections.map(sec => {
+        const isOpen = state.expandedFavFolders.has(sec.key);
+        return `
+          <div class="folder-card">
+            <div class="folder-header" data-toggle-fav-folder="${esc(sec.key)}">
+              <div class="folder-left">
+                <svg class="chevron ${isOpen ? 'open' : ''}" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                </svg>
+                <span class="folder-icon-wrap" style="background:${sec.color}20; color:${sec.color};">
+                  <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M19.5 21a3 3 0 003-3v-4.5a3 3 0 00-3-3h-15a3 3 0 00-3 3V18a3 3 0 003 3h15zM1.5 10.146V6a3 3 0 013-3h5.379a2.25 2.25 0 011.59.659l2.122 2.121c.14.141.331.22.53.22H19.5a3 3 0 013 3v1.146A4.483 4.483 0 0019.5 9h-15a4.483 4.483 0 00-3 1.146z" />
+                  </svg>
+                </span>
+                <span class="folder-title">${esc(sec.name)}</span>
+              </div>
+
+              <div style="display:flex; align-items:center; gap:4px;">
+                ${sec.isCustom ? `
+                  <button type="button" class="mini-act-btn" data-edit-fav-folder="${esc(sec.id)}" title="Перейменувати папку">✎</button>
+                  <button type="button" class="mini-act-btn" style="color:var(--danger);" data-delete-fav-folder="${esc(sec.id)}" title="Видалити папку">🗑</button>
+                ` : ''}
+                <span class="folder-count">${sec.contacts.length}</span>
+              </div>
+            </div>
+
+            ${isOpen ? `
+              <div class="folder-body">
+                ${sec.contacts.length > 0
+                  ? sec.contacts.map(c => renderContactRow(c, { showPath: true, favControls: true })).join('')
+                  : `<div style="padding:14px; font-size:12px; color:var(--text-muted); text-align:center;">Папка порожня. Додайте контакти через іконку папки на картці.</div>`
+                }
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }).join('');
+
+      return `${toolbarHtml}<div class="tree-stack">${foldersHtml}</div>`;
+    }
+
+    function renderSearchResults() {
+      const qRaw = state.query.trim();
+      const qLow = qRaw.toLowerCase();
+      const qDigits = normalizePhone(qRaw);
+      const hasDigits = qDigits.length >= 2 && /\d/.test(qDigits);
+
+      const matches = [];
+
+      for (let i = 0; i < state.db.raes.length; i++) {
+        const item = state.db.raes[i];
+        const hitText =
+          (item.name && item.name.toLowerCase().includes(qLow)) ||
+          (item.position && item.position.toLowerCase().includes(qLow)) ||
+          (item.phone && item.phone.toLowerCase().includes(qLow)) ||
+          (item.room && item.room.toLowerCase().includes(qLow)) ||
+          (item.subdivision && item.subdivision.toLowerCase().includes(qLow)) ||
+          (item.department && item.department.toLowerCase().includes(qLow));
+        const hitPhone = hasDigits && item.phoneClean && item.phoneClean.includes(qDigits);
+        if (hitText || hitPhone) matches.push(item);
+      }
+
+      for (let i = 0; i < state.db.external.length; i++) {
+        const item = state.db.external[i];
+        const hitText =
+          (item.title && item.title.toLowerCase().includes(qLow)) ||
+          (item.details && item.details.toLowerCase().includes(qLow)) ||
+          (item.phone && item.phone.toLowerCase().includes(qLow)) ||
+          (item.org && item.org.toLowerCase().includes(qLow)) ||
+          (item.subcat && item.subcat.toLowerCase().includes(qLow));
+        const hitPhone = hasDigits && item.phoneClean && item.phoneClean.includes(qDigits);
+        if (hitText || hitPhone) matches.push(item);
+      }
+
+      if (matches.length === 0) {
+        return `
+          <div class="empty-card">
+            <h3 class="empty-title">Нічого не знайдено</h3>
+            <p class="empty-desc" style="margin:0;">За запитом «${esc(qRaw)}» збігів немає.</p>
+          </div>
+        `;
+      }
+
+      const visible = matches.slice(0, state.searchLimit);
+      const hasMore = matches.length > state.searchLimit;
+
+      return `
+        <div class="toolbar-row">
+          <span class="meta-pill">Результати пошуку: ${matches.length}</span>
+        </div>
+        <div class="folder-card">
+          ${visible.map(c => renderContactRow(c, { query: qRaw, showPath: true })).join('')}
+        </div>
+        ${hasMore ? `
+          <div style="text-align:center; margin-top:12px;">
+            <button type="button" id="load-more-search-btn" class="btn-ghost" style="width:100%; justify-content:center; padding:10px;">
+              Показати ще (показано ${visible.length} із ${matches.length})
+            </button>
+          </div>
+        ` : ''}
+      `;
+    }
+
+    function render() {
+      const hasData = state.db.raes.length > 0 || state.db.external.length > 0;
+
+      document.getElementById('tab-count-raes').textContent = state.db.raes.length ? `(${state.db.raes.length})` : '';
+      document.getElementById('tab-count-ext').textContent = state.db.external.length ? `(${state.db.external.length})` : '';
+      document.getElementById('tab-count-fav').textContent = state.favData.items.length ? `(${state.favData.items.length})` : '';
+
+      const container = document.getElementById('app-content');
+
+      if (!hasData && state.tab !== 'favorites') {
+        container.innerHTML = renderWelcomeEmpty();
+        return;
+      }
+
+      if (state.query.trim().length > 0) {
+        container.innerHTML = renderSearchResults();
+        ensureSearchResultsVisible();
+        requestAnimationFrame(() => ensureSearchResultsVisible());
+        setTimeout(() => ensureSearchResultsVisible(), 80);
+        return;
+      }
+
+      if (state.tab === 'raes') {
+        container.innerHTML = renderTwoLevelTree({
+          items: state.db.raes,
+          scopePrefix: 'raes',
+          level1Key: 'subdivision',
+          level2Key: 'department',
+          emptyText: 'На аркуші «РАЕС» записів не знайдено.'
+        });
+      } else if (state.tab === 'external') {
+        container.innerHTML = renderTwoLevelTree({
+          items: state.db.external,
+          scopePrefix: 'ext',
+          level1Key: 'org',
+          level2Key: 'subcat',
+          emptyText: 'На аркуші «Сторонні організації» записів не знайдено.'
+        });
+      } else {
+        container.innerHTML = renderFavoritesTab();
+      }
+    }
+
+    /**
+     * =========================================================================
+     * 8. НАВІГАЦІЯ, ПЕРЕМИКАЧІ ДЕРЕВА, МЕНЮ ТА ТЕМА
+     * =========================================================================
+     */
+    function setTab(tabName) {
+      if (state.query.trim()) clearSearch();
+      state.tab = tabName;
+
+      document.querySelectorAll('.nav-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tabName);
+      });
+
+      scrollPageToTopImmediate();
+      render();
+    }
+
+    function toggleNode(nodeId) {
+      if (!nodeId) return;
+      if (state.expandedNodes.has(nodeId)) {
+        state.expandedNodes.delete(nodeId);
+      } else {
+        state.expandedNodes.add(nodeId);
+      }
+      render();
+    }
+
+    function toggleAllFoldersInCurrentTab() {
+      if (state.tab === 'favorites') {
+        const allKeys = ['__root__', ...state.favData.folders.map(f => f.id)];
+        const anyOpen = allKeys.some(k => state.expandedFavFolders.has(k));
+        if (anyOpen) {
+          state.expandedFavFolders.clear();
+        } else {
+          allKeys.forEach(k => state.expandedFavFolders.add(k));
+        }
+        render();
+        return;
+      }
+
+      const prefix = state.tab === 'raes' ? 'raes::L1::' : 'ext::L1::';
+      const l1Ids = [];
+      for (const [rawKey, id] of state.nodeKeyToId.entries()) {
+        if (rawKey.startsWith(prefix)) l1Ids.push(id);
+      }
+
+      const anyOpen = Array.from(state.expandedNodes).some(id => {
+        const raw = state.nodeIdToKey.get(id) || '';
+        return raw.startsWith(state.tab === 'raes' ? 'raes::' : 'ext::');
+      });
+
+      if (anyOpen) {
+        for (const id of Array.from(state.expandedNodes)) {
+          const raw = state.nodeIdToKey.get(id) || '';
+          if (raw.startsWith(state.tab === 'raes' ? 'raes::' : 'ext::')) {
+            state.expandedNodes.delete(id);
+          }
+        }
+        showToast('Папки згорнуто');
+      } else {
+        l1Ids.forEach(id => state.expandedNodes.add(id));
+        showToast('Папки розгорнуто');
+      }
+      render();
+    }
+
+    function toggleFavFolder(key) {
+      state.expandedFavFolders.has(key) ? state.expandedFavFolders.delete(key) : state.expandedFavFolders.add(key);
+      render();
+    }
+
+    function clearSearch() {
+      const input = document.getElementById('search-input');
+      input.value = '';
+      state.query = '';
+      state.searchLimit = 120;
+      document.getElementById('search-clear-btn').classList.add('hidden');
+      document.getElementById('search-reset-btn').classList.add('hidden');
+      render();
+      scrollPageToTopImmediate();
+    }
+
+    function toggleTheme() {
+      const isDark = document.documentElement.classList.toggle('dark');
+      localStorage.setItem('raes_theme_v4', isDark ? 'dark' : 'light');
+    }
+
+    /**
+     * =========================================================================
+     * 9. PWA MANIFEST + SERVICE WORKER
+     * =========================================================================
+     */
+    function setupPWA() {
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredInstallPrompt = e;
+        const lbl = document.getElementById('menu-install-label');
+        if (lbl) lbl.textContent = 'Встановити додаток ★';
+      });
+
+      window.addEventListener('appinstalled', () => {
+        deferredInstallPrompt = null;
+        showToast('Додаток успішно встановлено');
+      });
+
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', () => {
+          const dock = document.querySelector('.bottom-dock');
+          if (dock) {
+            const offset = Math.max(0, window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop);
+            dock.style.bottom = offset + 'px';
+          }
+          if (state.query.trim().length > 0) {
+            ensureSearchResultsVisible();
+          }
+        });
+      }
+
+      if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      }
+    }
+
+    /**
+     * =========================================================================
+     * 10. ІНІЦІАЛІЗАЦІЯ ТА ЄДИНЕ ДЕЛЕГУВАННЯ ПОДІЙ
+     * =========================================================================
+     */
+    window.addEventListener('DOMContentLoaded', async () => {
+      const savedTheme = localStorage.getItem('raes_theme_v4');
+      if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+      }
+
+      setupPWA();
+
+      const savedDb = await storageGet('phonebook_db_v4');
+      if (savedDb && (Array.isArray(savedDb.raes) || Array.isArray(savedDb.external))) {
+        state.db = {
+          raes: savedDb.raes || [],
+          external: savedDb.external || []
+        };
+        rebuildContactIndex();
+      }
+
+      const savedFavs = await storageGet('fav_data_v4');
+      if (savedFavs && Array.isArray(savedFavs.items)) {
+        state.favData = {
+          folders: Array.isArray(savedFavs.folders) ? savedFavs.folders : [],
+          items: savedFavs.items
+        };
+      }
+
+      render();
+
+      document.getElementById('excel-input').addEventListener('change', onFileSelected);
+      document.getElementById('backup-input').addEventListener('change', onBackupFileSelected);
+
+      document.getElementById('menu-toggle-btn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleHeaderMenu();
+      });
+
+      document.getElementById('header-menu-dropdown').addEventListener('click', (e) => {
+        const actionBtn = e.target.closest('[data-menu-action]');
+        if (!actionBtn) return;
+        const action = actionBtn.dataset.menuAction;
+        closeHeaderMenu();
+
+        if (action === 'new-fav-folder') {
+          openFolderModal(null);
+        } else if (action === 'toggle-all-folders') {
+          toggleAllFoldersInCurrentTab();
+        } else if (action === 'toggle-theme') {
+          toggleTheme();
+        } else if (action === 'install-pwa') {
+          triggerPwaInstall();
+        } else if (action === 'export-backup') {
+          exportBackup();
+        } else if (action === 'ask-clear-db') {
+          document.getElementById('confirm-clear-modal').classList.remove('hidden');
+        }
+      });
+
+      document.addEventListener('click', (e) => {
+        if (!e.target.closest('#header-menu-wrap')) {
+          closeHeaderMenu();
+        }
+      });
+
+      document.getElementById('tabs-bar').addEventListener('click', (e) => {
+        const tabBtn = e.target.closest('[data-tab]');
+        if (tabBtn) setTab(tabBtn.dataset.tab);
+      });
+
+      const searchInput = document.getElementById('search-input');
+      const clearBtn = document.getElementById('search-clear-btn');
+      const resetBtn = document.getElementById('search-reset-btn');
+
+      searchInput.addEventListener('input', (e) => {
+        state.query = e.target.value;
+        state.searchLimit = 120;
+        const hasText = state.query.length > 0;
+        clearBtn.classList.toggle('hidden', !hasText);
+        resetBtn.classList.toggle('hidden', !hasText);
+        render();
+      });
+
+      searchInput.addEventListener('focus', () => {
+        if (state.query.trim().length > 0) {
+          setTimeout(() => scrollPageToTopImmediate(), 60);
+        }
+      });
+
+      clearBtn.addEventListener('click', clearSearch);
+      resetBtn.addEventListener('click', clearSearch);
+
+      document.getElementById('app-content').addEventListener('click', (e) => {
+        const copyBtn = e.target.closest('[data-copy-phone]');
+        if (copyBtn) {
+          e.stopPropagation();
+          copyText(copyBtn.dataset.copyPhone);
+          return;
+        }
+
+        const starBtn = e.target.closest('[data-toggle-star]');
+        if (starBtn) {
+          e.stopPropagation();
+          toggleStarQuick(starBtn.dataset.toggleStar);
+          return;
+        }
+
+        const assignBtn = e.target.closest('[data-open-assign]');
+        if (assignBtn) {
+          e.stopPropagation();
+          openAssignModal(assignBtn.dataset.openAssign);
+          return;
+        }
+
+        const moveBtn = e.target.closest('[data-fav-move]');
+        if (moveBtn) {
+          e.stopPropagation();
+          moveFavItem(moveBtn.dataset.cid, parseInt(moveBtn.dataset.favMove, 10));
+          return;
+        }
+
+        const editFldBtn = e.target.closest('[data-edit-fav-folder]');
+        if (editFldBtn) {
+          e.stopPropagation();
+          openFolderModal(editFldBtn.dataset.editFavFolder);
+          return;
+        }
+
+        const delFldBtn = e.target.closest('[data-delete-fav-folder]');
+        if (delFldBtn) {
+          e.stopPropagation();
+          deleteFavFolder(delFldBtn.dataset.deleteFavFolder);
+          return;
+        }
+
+        const newFldBtn = e.target.closest('[data-open-folder-modal]');
+        if (newFldBtn) {
+          e.stopPropagation();
+          openFolderModal(null);
+          return;
+        }
+
+        const favFolderHdr = e.target.closest('[data-toggle-fav-folder]');
+        if (favFolderHdr) {
+          toggleFavFolder(favFolderHdr.dataset.toggleFavFolder);
+          return;
+        }
+
+        const nodeHdr = e.target.closest('[data-toggle-node]');
+        if (nodeHdr) {
+          toggleNode(nodeHdr.dataset.toggleNode);
+          return;
+        }
+
+        if (e.target.closest('#load-more-search-btn')) {
+          state.searchLimit += 150;
+          render();
+          return;
+        }
+
+        if (e.target.closest('#load-demo-btn')) {
+          loadDemoData();
+        }
+      });
+
+      document.addEventListener('click', (e) => {
+        if (e.target.classList.contains('modal-backdrop')) {
+          closeModal(e.target.id);
+          return;
+        }
+
+        const closeBtn = e.target.closest('[data-close-modal]');
+        if (closeBtn) {
+          closeModal(closeBtn.dataset.closeModal);
+          return;
+        }
+
+        const assignFldBtn = e.target.closest('[data-assign-folder]');
+        if (assignFldBtn) {
+          assignContactToFolder(assignFldBtn.dataset.assignFolder);
+          return;
+        }
+
+        const removeFavBtn = e.target.closest('[data-remove-fav]');
+        if (removeFavBtn) {
+          removeFromFavorites(removeFavBtn.dataset.removeFav);
+          return;
+        }
+
+        const colorBtn = e.target.closest('[data-pick-color]');
+        if (colorBtn) {
+          state.selectedFolderColor = colorBtn.dataset.pickColor;
+          renderFolderColors();
+        }
+      });
+
+      document.getElementById('quick-folder-create-btn').addEventListener('click', createFolderAndAssign);
+      document.getElementById('save-folder-btn').addEventListener('click', saveFolderModal);
+      document.getElementById('confirm-clear-btn').addEventListener('click', clearDatabase);
+
+      document.getElementById('folder-name-input').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') saveFolderModal();
+      });
+      document.getElementById('quick-folder-name').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') createFolderAndAssign();
+      });
+    });
+  </script>
+</body>
+</html>
