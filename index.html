@@ -965,7 +965,7 @@
           <div class="menu-divider"></div>
           <div class="menu-version">
             <span>Телефонний довідник</span>
-            <span>v1.6.0</span>
+            <span>v1.6.1</span>
           </div>
         </div>
       </div>
@@ -1478,7 +1478,7 @@
     }
 
     function cleanNumberTrailingZero(str) {
-      return String(str || '').replace(/(\d+)\.0+/g, '$1').trim();
+      return String(str || '').replace(/\b(\d+)\.0+\b/g, '$1').trim();
     }
 
     function isHeaderRow(a, b, c) {
@@ -1662,9 +1662,7 @@
           continue;
         }
 
-        const lines = valA.split(/
-?
-/).map(l => l.trim()).filter(Boolean);
+        const lines = valA.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
         const title = lines[0] || valB || 'Контакт';
         const details = lines.slice(1).join(' • ') || (lines[0] && valB ? valB : '');
         const phone = valC || valB;
