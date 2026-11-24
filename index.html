@@ -939,7 +939,7 @@
           <div class="menu-divider"></div>
           <div class="menu-version">
             <span>Телефонний довідник</span>
-            <span>v1.6.4</span>
+            <span>v1.6.5</span>
           </div>
         </div>
       </div>
@@ -1081,7 +1081,7 @@
   <div id="toast" class="toast">Скопійовано</div>
 
   <script>
-    const APP_VERSION = '1.6.4';
+    const APP_VERSION = '1.6.5';
 
     /**
      * =========================================================================
@@ -1268,66 +1268,50 @@
         const grayXfSet = new Set();
         if (!stylesDoc) return grayXfSet;
 
+        // Колір вважається «сірим підрозділом», якщо він нейтрально-сірий (≈ 192,192,192 / C0C0C0)
+        const isGrayColorNode = (node) => {
+          if (!node) return false;
+          const rgb = node.getAttribute('rgb');
+          if (rgb) {
+            let hex = rgb.trim().toUpperCase();
+            if (hex.length === 8) hex = hex.slice(2);
+            if (hex.length === 6) {
+              const r = parseInt(hex.slice(0, 2), 16);
+              const g = parseInt(hex.slice(2, 4), 16);
+              const b = parseInt(hex.slice(4, 6), 16);
+              if ([r, g, b].some(isNaN)) return false;
+              const neutral = Math.max(r, g, b) - Math.min(r, g, b) <= 12;
+              return neutral && r >= 150 && r <= 225;
+            }
+            return false;
+          }
+          const indexed = node.getAttribute('indexed');
+          if (indexed !== null) return indexed === '22' || indexed === '55'; // Silver / Gray-25%
+          const theme = node.getAttribute('theme');
+          if (theme !== null) {
+            const tint = parseFloat(node.getAttribute('tint') || '0');
+            return (theme === '0' || theme === '2') && tint <= -0.1 && tint >= -0.4;
+          }
+          return false;
+        };
+
         const grayFillIds = new Set();
         const fills = this.getByTag(stylesDoc, 'fill');
-
         for (let i = 0; i < fills.length; i++) {
           const patternFill = this.getByTag(fills[i], 'patternFill')[0];
           if (!patternFill) continue;
-          const patternType = (patternFill.getAttribute('patternType') || '').toLowerCase();
-          if (!patternType || patternType === 'none') continue;
-          if (i === 1 && patternType === 'gray125') continue;
-
+          if ((patternFill.getAttribute('patternType') || '').toLowerCase() !== 'solid') continue;
           const fgColor = this.getByTag(patternFill, 'fgColor')[0];
-          const bgColor = this.getByTag(patternFill, 'bgColor')[0];
-
-          const hasVisibleFillColor = (node) => {
-            if (!node) return false;
-            const rgb = node.getAttribute('rgb');
-            if (rgb) {
-              let hex = rgb.trim().toUpperCase();
-              if (hex.length === 8) hex = hex.slice(2);
-              if (hex === 'FFFFFF' || hex === '000000') return false;
-              if (hex.length === 6) {
-                const r = parseInt(hex.slice(0, 2), 16);
-                const g = parseInt(hex.slice(2, 4), 16);
-                const b = parseInt(hex.slice(4, 6), 16);
-                if (!isNaN(r) && !isNaN(g) && !isNaN(b)) {
-                  return !(r > 248 && g > 248 && b > 248);
-                }
-              }
-            }
-            const indexed = node.getAttribute('indexed');
-            if (indexed !== null && indexed !== '64' && indexed !== '65' && indexed !== '9') {
-              return true;
-            }
-            const theme = node.getAttribute('theme');
-            if (theme !== null) {
-              const tint = parseFloat(node.getAttribute('tint') || '0');
-              if (theme === '0' && Math.abs(tint) < 0.02) return false;
-              return true;
-            }
-            return false;
-          };
-
-          if (hasVisibleFillColor(fgColor) || hasVisibleFillColor(bgColor) || patternType === 'solid') {
-            const fgRgb = (fgColor?.getAttribute('rgb') || '').toUpperCase();
-            if (!fgRgb.endsWith('FFFFFF')) {
-              grayFillIds.add(i);
-            }
-          }
+          if (isGrayColorNode(fgColor)) grayFillIds.add(i);
         }
 
-        // Также учитываем cellStyleXfs (если заливка задана через именованный стиль ячейки)
         const styleXfsGray = new Set();
         const cellStyleXfs = this.getByTag(stylesDoc, 'cellStyleXfs')[0];
         if (cellStyleXfs) {
           const sxfs = this.getByTag(cellStyleXfs, 'xf');
           for (let i = 0; i < sxfs.length; i++) {
             const fillId = parseInt(sxfs[i].getAttribute('fillId') || '-1', 10);
-            if (grayFillIds.has(fillId)) {
-              styleXfsGray.add(i);
-            }
+            if (grayFillIds.has(fillId)) styleXfsGray.add(i);
           }
         }
 
@@ -1507,16 +1491,15 @@
     function applyMergeInheritance(rowsMap, merges, targetCols) {
       for (let i = 0; i < merges.length; i++) {
         const m = merges[i];
-        // Пропускаємо суто горизонтальні заголовки на всю ширину A:C / A:D
-        if (m.s.r === m.e.r && m.s.c === 0 && m.e.c >= 2) continue;
-        if (m.e.r <= m.s.r) continue;
+        // Лише вертикальні/прямокутні об'єднання; широкі заголовки A:C / A:D пропускаємо
+        if (m.s.col === 0 && m.e.col >= 2) continue;
+        if (m.e.row <= m.s.row) continue;
 
-        for (let col = m.s.c; col <= m.e.c; col++) {
+        for (let col = m.s.col; col <= m.e.col; col++) {
           if (!targetCols.includes(col)) continue;
 
-          // Шукаємо непорожнє значення в об'єднаному діапазоні (верхня комірка m.s.r)
           let sourceCell = null;
-          for (let sr = m.s.r; sr <= m.e.r; sr++) {
+          for (let sr = m.s.row; sr <= m.e.row; sr++) {
             const candidate = rowsMap.get(sr)?.get(col);
             if (candidate && candidate.value !== '') {
               sourceCell = candidate;
@@ -1525,7 +1508,7 @@
           }
 
           if (sourceCell) {
-            for (let r = m.s.r; r <= m.e.r; r++) {
+            for (let r = m.s.row; r <= m.e.row; r++) {
               let rowCells = rowsMap.get(r);
               if (!rowCells) {
                 rowCells = new Map();
@@ -1539,6 +1522,18 @@
           }
         }
       }
+    }
+
+    /** Рядки, об'єднані на всю ширину (від колонки A до C або D) */
+    function buildFullWidthMergeMap(merges) {
+      const map = new Map();
+      for (let i = 0; i < merges.length; i++) {
+        const m = merges[i];
+        if (m.s.col === 0 && m.e.col >= 2) {
+          for (let r = m.s.row; r <= m.e.row; r++) map.set(r, m);
+        }
+      }
+      return map;
     }
 
     /**
@@ -1557,16 +1552,7 @@
       // Колонки C (2 — телефон) і D (3 — кабінет) успадковують значення з верхньої комірки об'єднання
       applyMergeInheritance(rowsMap, merges, [2, 3]);
 
-      // Словник горизонтальних об'єднань A:C / A:D (покриває і однорядкові, і багаторядкові об'єднання A:D)
-      const fullWidthMergeByRow = new Map();
-      for (let i = 0; i < merges.length; i++) {
-        const m = merges[i];
-        if (m.s.c === 0 && m.e.c >= 2) {
-          for (let r = m.s.r; r <= m.e.r; r++) {
-            fullWidthMergeByRow.set(r, m);
-          }
-        }
-      }
+      const fullWidthMergeByRow = buildFullWidthMergeMap(merges);
 
       const defaultSubdivision = sheet.name ? sheet.name.trim() : 'Основний розділ';
       const contacts = [];
@@ -1589,20 +1575,21 @@
         const fullMerge = fullWidthMergeByRow.get(r);
         const isGray = isSubdivisionGrayRow(rowCells);
 
-        // 1. Новий цех/підрозділ: сірий рядок, об'єднаний на всю ширину A:D (або A:C)
-        if (fullMerge && isGray) {
-          if (r === fullMerge.s.r && valA) {
+        // 1. Підрозділ: сірий (192,192,192) заголовок без телефону/ПІБ/місця
+        //    (зазвичай об'єднаний A:D). Створює папку 1-го рівня.
+        const isTitleOnly = valA && !valB && !valC && !valD;
+        if (isGray && isTitleOnly) {
+          if (!fullMerge || r === fullMerge.s.row) {
             currentSubdivision = valA.replace(/\s+/g, ' ').trim();
             currentDepartment = '';
           }
           continue;
         }
+        if (isGray) continue;
 
-        // 2. Підпідрозділ / відділ / лабораторія:
-        //    ТІЛЬКИ рядок, об'єднаний на всю ширину A:D (або A:C) без сірої заливки!
-        //    Необ'єднані рядки (як наприклад ЦЩРК-3,4 у клітинці A без об'єднання A:D) не стають папками.
-        if (fullMerge && !isGray) {
-          if (r === fullMerge.s.r && valA) {
+        // 2. Підпідрозділ: рядок, об'єднаний на всю ширину, без сірої заливки
+        if (fullMerge && !valB && !valC && !valD) {
+          if (r === fullMerge.s.row && valA) {
             currentDepartment = valA.replace(/\s+/g, ' ').trim();
           }
           continue;
@@ -1638,15 +1625,7 @@
 
       applyMergeInheritance(rowsMap, merges, [2]);
 
-      const fullWidthMergeByRow = new Map();
-      for (let i = 0; i < merges.length; i++) {
-        const m = merges[i];
-        if (m.s.c === 0 && m.e.c >= 2) {
-          for (let r = m.s.r; r <= m.e.r; r++) {
-            fullWidthMergeByRow.set(r, m);
-          }
-        }
-      }
+      const fullWidthMergeByRow = buildFullWidthMergeMap(merges);
 
       const defaultOrg = sheet.name ? sheet.name.trim() : 'Додатковий розділ';
       const contacts = [];
@@ -1668,16 +1647,18 @@
         const fullMerge = fullWidthMergeByRow.get(r);
         const isGray = isSubdivisionGrayRow(rowCells);
 
-        if (fullMerge && isGray) {
-          if (r === fullMerge.s.r && valA) {
+        const isTitleOnly = valA && !valB && !valC;
+        if (isGray && isTitleOnly) {
+          if (!fullMerge || r === fullMerge.s.row) {
             currentOrg = valA.replace(/\s+/g, ' ').trim();
             currentSubcat = '';
           }
           continue;
         }
+        if (isGray) continue;
 
-        if (fullMerge && !isGray) {
-          if (r === fullMerge.s.r && valA) {
+        if (fullMerge && !valB && !valC) {
+          if (r === fullMerge.s.row && valA) {
             currentSubcat = valA.replace(/\s+/g, ' ').trim();
           }
           continue;
@@ -2420,7 +2401,7 @@
             ` : ''}
 
             ${item.room ? `
-              <span class="contact-room">Кабінет ${hl(item.room, query)}</span>
+              <span class="contact-room">📍 ${hl(item.room, query)}</span>
             ` : ''}
           </div>
 
