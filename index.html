@@ -2,12 +2,11 @@
 <html lang="uk">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, interactive-widget=resizes-content" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover, interactive-widget=resizes-content" />
   <title>Телефонний довідник</title>
 
   <!-- PWA мета-теги -->
-  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
-  <meta name="theme-color" content="#0b0f19" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" id="theme-color-meta" content="#ffffff" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Довідник" />
@@ -66,6 +65,8 @@
       --shadow-modal: 0 24px 50px rgba(0, 0, 0, 0.6);
       --shadow-menu: 0 16px 36px rgba(0, 0, 0, 0.55);
     }
+
+    html { background: var(--bg); }
 
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
@@ -552,6 +553,50 @@
       word-break: break-word;
     }
 
+    .contact-row.has-details { cursor: pointer; }
+    .contact-row.fav-row {
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+    }
+    .more-ind {
+      display: inline-block;
+      margin-left: 6px;
+      color: var(--text-muted);
+      font-weight: 700;
+      transition: transform 0.15s;
+    }
+    .more-ind.open { transform: rotate(90deg); color: var(--accent); }
+    .note-badge { margin-left: 5px; font-size: 12px; }
+    .contact-details { margin-top: 6px; display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+    .contact-note {
+      width: 100%;
+      font-size: 12.5px;
+      line-height: 1.4;
+      color: var(--text);
+      background: color-mix(in srgb, var(--warn) 16%, transparent);
+      border-left: 3px solid var(--warn);
+      border-radius: 6px;
+      padding: 6px 9px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .note-textarea {
+      width: 100%;
+      min-height: 110px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text);
+      font-size: 14px;
+      font-family: inherit;
+      resize: vertical;
+      outline: none;
+    }
+    .note-textarea:focus { border-color: var(--accent); background: var(--surface); }
+    .fav-hint { font-size: 11.5px; color: var(--text-muted); margin: -4px 0 10px; }
+
     .contact-room {
       display: inline-block;
       margin-top: 4px;
@@ -939,7 +984,7 @@
           <div class="menu-divider"></div>
           <div class="menu-version">
             <span>Телефонний довідник</span>
-            <span>v1.6.5</span>
+            <span>v1.6.6</span>
           </div>
         </div>
       </div>
@@ -1035,6 +1080,25 @@
     </div>
   </div>
 
+  <!-- МОДАЛЬНЕ ВІКНО: ПРИМІТКА ДО КОНТАКТУ В ОБРАНОМУ -->
+  <div id="note-modal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 class="modal-title">Примітка до контакту</h3>
+        <button class="modal-close" type="button" data-close-modal="note-modal">×</button>
+      </div>
+      <div id="note-contact-preview" style="font-size:12px; color:var(--text-sec); margin-bottom:10px;"></div>
+      <textarea id="note-textarea" class="note-textarea" placeholder="Введіть примітку..."></textarea>
+      <div style="display:flex; justify-content:space-between; gap:8px; margin-top:14px;">
+        <button type="button" id="note-delete-btn" class="btn-ghost" style="color:var(--danger);">Видалити</button>
+        <div style="display:flex; gap:8px;">
+          <button type="button" data-close-modal="note-modal" class="btn-ghost">Скасувати</button>
+          <button type="button" id="note-save-btn" class="btn-import">Зберегти</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- МОДАЛЬНЕ ВІКНО: ПІДТВЕРДЖЕННЯ ОЧИЩЕННЯ БАЗИ -->
   <div id="confirm-clear-modal" class="modal-backdrop hidden">
     <div class="modal-card">
@@ -1081,7 +1145,7 @@
   <div id="toast" class="toast">Скопійовано</div>
 
   <script>
-    const APP_VERSION = '1.6.5';
+    const APP_VERSION = '1.6.6';
 
     /**
      * =========================================================================
@@ -1784,6 +1848,8 @@
       nodeIdCounter: 0,
       expandedNodes: new Set(),
       expandedFavFolders: new Set(['__root__']),
+      expandedContacts: new Set(),
+      noteContactId: null,
       contactsById: new Map(),
       assigningContactId: null,
       editingFolderId: null,
@@ -2142,6 +2208,7 @@
       document.getElementById(modalId)?.classList.add('hidden');
       if (modalId === 'assign-modal') state.assigningContactId = null;
       if (modalId === 'folder-modal') state.editingFolderId = null;
+      if (modalId === 'note-modal') state.noteContactId = null;
     }
 
     async function assignContactToFolder(folderId) {
@@ -2381,12 +2448,29 @@
         ? (item.name || item.position || '—')
         : (item.title || '—');
 
-      const secondarySubtitle = item.source === 'main'
-        ? (item.name && item.position ? item.position : '')
+      const isMain = item.source === 'main';
+      const favView = Boolean(opts.favView || favControls);
+      const note = favView ? (favEntry?.note || '') : '';
+
+      // В «Обраному» посада ховається до натискання; кабінет/місце (колонка D) — завжди до натискання
+      const hiddenPosition = favView && isMain && item.name && item.position ? item.position : '';
+      const hiddenRoom = isMain ? (item.room || '') : '';
+
+      const secondarySubtitle = isMain
+        ? (!favView && item.name && item.position ? item.position : '')
         : (item.details || '');
 
+      const hasDetails = Boolean(hiddenPosition || hiddenRoom || note);
+      const expKey = (favView ? 'f:' : 'm:') + item.id;
+      const qLowRow = query.trim().toLowerCase();
+      const forcedOpen = Boolean(qLowRow) &&
+        `${hiddenPosition} ${hiddenRoom} ${note}`.toLowerCase().includes(qLowRow);
+      const isOpen = hasDetails && (state.expandedContacts.has(expKey) || forcedOpen);
+
       return `
-        <div class="contact-row">
+        <div class="contact-row${hasDetails ? ' has-details' : ''}${favView ? ' fav-row' : ''}"
+          ${hasDetails ? `data-contact-toggle="${esc(expKey)}"` : ''}
+          ${favView ? `data-fav-row="${esc(item.id)}"` : ''}>
           <div class="contact-info">
             ${showPath && pathParts.length ? `
               <div class="contact-path">
@@ -2394,14 +2478,18 @@
               </div>
             ` : ''}
 
-            <div class="contact-name">${hl(primaryTitle, query)}</div>
+            <div class="contact-name">${hl(primaryTitle, query)}${note ? '<span class="note-badge" title="Є примітка">📝</span>' : ''}${hasDetails ? `<span class="more-ind ${isOpen ? 'open' : ''}">›</span>` : ''}</div>
 
             ${secondarySubtitle ? `
               <div class="contact-pos">${hl(secondarySubtitle, query)}</div>
             ` : ''}
 
-            ${item.room ? `
-              <span class="contact-room">📍 ${hl(item.room, query)}</span>
+            ${isOpen ? `
+              <div class="contact-details">
+                ${hiddenPosition ? `<div class="contact-pos">${hl(hiddenPosition, query)}</div>` : ''}
+                ${hiddenRoom ? `<span class="contact-room" style="margin-top:0;">📍 ${hl(hiddenRoom, query)}</span>` : ''}
+                ${note ? `<div class="contact-note">${hl(note, query)}</div>` : ''}
+              </div>
             ` : ''}
           </div>
 
@@ -2608,6 +2696,10 @@
         </div>
       `;
 
+      const hintHtml = resolvedItems.length > 0
+        ? '<div class="fav-hint">Натисніть на контакт — деталі. Утримуйте контакт — додати примітку.</div>'
+        : '';
+
       if (resolvedItems.length === 0 && state.favData.folders.length === 0) {
         return `
           ${toolbarHtml}
@@ -2678,7 +2770,7 @@
         `;
       }).join('');
 
-      return `${toolbarHtml}<div class="tree-stack">${foldersHtml}</div>`;
+      return `${toolbarHtml}${hintHtml}<div class="tree-stack">${foldersHtml}</div>`;
     }
 
     /**
@@ -2724,7 +2816,8 @@
             (item.subdivision && item.subdivision.toLowerCase().includes(qLow)) ||
             (item.department && item.department.toLowerCase().includes(qLow)) ||
             (item.org && item.org.toLowerCase().includes(qLow)) ||
-            (item.subcat && item.subcat.toLowerCase().includes(qLow));
+            (item.subcat && item.subcat.toLowerCase().includes(qLow)) ||
+            (getFavEntry(item.id)?.note || '').toLowerCase().includes(qLow);
           const hitPhone = hasDigits && item.phoneClean && item.phoneClean.includes(qDigits);
           if (hitText || hitPhone) matches.push(item);
         }
@@ -2761,7 +2854,7 @@
           <span class="meta-pill">${esc(scopeTitle)} — знайдено: ${matches.length}</span>
         </div>
         <div class="folder-card">
-          ${visible.map(c => renderContactRow(c, { query: qRaw, showPath: true })).join('')}
+          ${visible.map(c => renderContactRow(c, { query: qRaw, showPath: true, favView: state.tab === 'favorites' })).join('')}
         </div>
         ${hasMore ? `
           <div style="text-align:center; margin-top:12px;">
@@ -2917,9 +3010,44 @@
       scrollPageToTopImmediate();
     }
 
+    function openNoteModal(contactId) {
+      const entry = getFavEntry(contactId);
+      if (!entry) return;
+      const contact = state.contactsById.get(contactId) || entry.snapshot || {};
+      state.noteContactId = contactId;
+      const label = contact.source === 'main' ? (contact.name || contact.position) : contact.title;
+      document.getElementById('note-contact-preview').textContent = label || '';
+      document.getElementById('note-textarea').value = entry.note || '';
+      document.getElementById('note-delete-btn').classList.toggle('hidden', !entry.note);
+      document.getElementById('note-modal').classList.remove('hidden');
+      setTimeout(() => document.getElementById('note-textarea').focus(), 60);
+    }
+
+    async function saveNote(clear = false) {
+      const entry = getFavEntry(state.noteContactId);
+      if (!entry) { closeModal('note-modal'); return; }
+      const text = clear ? '' : document.getElementById('note-textarea').value.trim();
+      if (text) {
+        entry.note = text;
+        state.expandedContacts.add('f:' + entry.contactId);
+      } else {
+        delete entry.note;
+      }
+      await persistFavorites();
+      closeModal('note-modal');
+      render();
+      showToast(text ? 'Примітку збережено' : 'Примітку видалено');
+    }
+
+    function applyThemeColor() {
+      const meta = document.getElementById('theme-color-meta');
+      if (meta) meta.setAttribute('content', document.documentElement.classList.contains('dark') ? '#0b0f19' : '#ffffff');
+    }
+
     function toggleTheme() {
       const isDark = document.documentElement.classList.toggle('dark');
       localStorage.setItem('phonebook_theme_v5', isDark ? 'dark' : 'light');
+      applyThemeColor();
     }
 
     /**
@@ -2964,6 +3092,7 @@
         document.documentElement.classList.add('dark');
       }
 
+      applyThemeColor();
       setupPWA();
 
       const savedDb = await storageGet('phonebook_db_v5');
@@ -3049,7 +3178,40 @@
       clearBtn.addEventListener('click', clearSearch);
       resetBtn.addEventListener('click', clearSearch);
 
-      document.getElementById('app-content').addEventListener('click', (e) => {
+      // Довге натискання на контакт в «Обраному» — примітка
+      const appContent = document.getElementById('app-content');
+      let lpTimer = null, lpX = 0, lpY = 0;
+      window.__suppressClickUntil = 0;
+      const cancelLongPress = () => { clearTimeout(lpTimer); lpTimer = null; };
+
+      appContent.addEventListener('pointerdown', (e) => {
+        const row = e.target.closest('[data-fav-row]');
+        if (!row || e.target.closest('button, a')) return;
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        lpX = e.clientX; lpY = e.clientY;
+        cancelLongPress();
+        lpTimer = setTimeout(() => {
+          lpTimer = null;
+          window.__suppressClickUntil = Date.now() + 700;
+          if (navigator.vibrate) { try { navigator.vibrate(20); } catch {} }
+          openNoteModal(row.dataset.favRow);
+        }, 550);
+      });
+      appContent.addEventListener('pointermove', (e) => {
+        if (lpTimer && Math.hypot(e.clientX - lpX, e.clientY - lpY) > 10) cancelLongPress();
+      });
+      ['pointerup', 'pointercancel', 'scroll'].forEach(ev =>
+        appContent.addEventListener(ev, cancelLongPress, true));
+      window.addEventListener('scroll', cancelLongPress, { passive: true });
+      appContent.addEventListener('contextmenu', (e) => {
+        if (e.target.closest('[data-fav-row]')) e.preventDefault();
+      });
+
+      document.getElementById('note-save-btn').addEventListener('click', () => saveNote(false));
+      document.getElementById('note-delete-btn').addEventListener('click', () => saveNote(true));
+
+      appContent.addEventListener('click', (e) => {
+        if (Date.now() < window.__suppressClickUntil) { e.preventDefault(); e.stopPropagation(); return; }
         const copyBtn = e.target.closest('[data-copy-phone]');
         if (copyBtn) {
           e.stopPropagation();
@@ -3102,6 +3264,14 @@
         const favFolderHdr = e.target.closest('[data-toggle-fav-folder]');
         if (favFolderHdr) {
           toggleFavFolder(favFolderHdr.dataset.toggleFavFolder);
+          return;
+        }
+
+        const contactToggle = e.target.closest('[data-contact-toggle]');
+        if (contactToggle && !e.target.closest('a')) {
+          const key = contactToggle.dataset.contactToggle;
+          state.expandedContacts.has(key) ? state.expandedContacts.delete(key) : state.expandedContacts.add(key);
+          render();
           return;
         }
 
