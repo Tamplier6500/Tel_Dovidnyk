@@ -253,9 +253,7 @@
       right: 0;
       bottom: 0;
       z-index: 35;
-      background: color-mix(in srgb, var(--surface) 95%, transparent);
-      backdrop-filter: blur(14px);
-      -webkit-backdrop-filter: blur(14px);
+      background: var(--surface);
       border-top: 1px solid var(--border);
       box-shadow: var(--shadow-dock);
       padding-bottom: env(safe-area-inset-bottom, 0px);
@@ -306,8 +304,8 @@
     .search-input::placeholder { color: var(--text-muted); }
     .search-input:focus {
       background: var(--surface);
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px var(--accent-soft);
+      border-color: var(--border);
+      box-shadow: none;
     }
 
     .search-clear {
@@ -965,7 +963,7 @@
           <div class="menu-divider"></div>
           <div class="menu-version">
             <span>Телефонний довідник</span>
-            <span>v1.6.1</span>
+            <span>v1.6.2</span>
           </div>
         </div>
       </div>
@@ -1107,7 +1105,7 @@
   <div id="toast" class="toast">Скопійовано</div>
 
   <script>
-    const APP_VERSION = '1.6.0';
+    const APP_VERSION = '1.6.2';
 
     /**
      * =========================================================================
@@ -1584,7 +1582,9 @@
         const hMerge = horizMergeByRow.get(r);
         const isGray = rowHasGrayFill(rowCells);
 
-        if ((hMerge && valA) || (!hMerge && valA && !valB && !valC && !valD)) {
+        // Заголовок підрозділу або відділу визначається ТІЛЬКИ горизонтальним об'єднанням A:C / A:D
+        // (якщо комірки не об'єднані по горизонталі, рядок із самою лише посадою в A без П.І.Б. у B — це запис контакту!)
+        if (hMerge && valA) {
           const cleanTitle = valA.replace(/\s+/g, ' ').trim();
           if (isGray) {
             currentSubdivision = cleanTitle;
@@ -1595,7 +1595,7 @@
           continue;
         }
 
-        if (valA || valB || valC) {
+        if (valA || valB || valC || valD) {
           const baseKey = buildStableContactKey('raes', [currentSubdivision, currentDepartment, valA, valB, valC, valD]);
           const seenCount = (dupCounter.get(baseKey) || 0) + 1;
           dupCounter.set(baseKey, seenCount);
@@ -1651,7 +1651,7 @@
         const hMerge = horizMergeByRow.get(r);
         const isGray = rowHasGrayFill(rowCells);
 
-        if ((hMerge && valA) || (!hMerge && valA && !valB && !valC)) {
+        if (hMerge && valA) {
           const cleanTitle = valA.replace(/\s+/g, ' ').trim();
           if (isGray) {
             currentOrg = cleanTitle;
@@ -1733,6 +1733,7 @@
     }
 
     async function storageSet(key, value) {
+      let idbSaved = false;
       try {
         const db = await openIDB();
         await new Promise((resolve, reject) => {
@@ -1741,11 +1742,16 @@
           tx.oncomplete = () => resolve(true);
           tx.onerror = () => reject(tx.error);
         });
+        idbSaved = true;
       } catch {}
 
       try {
         localStorage.setItem('fallback_' + key, JSON.stringify(value));
-      } catch {}
+      } catch {
+        if (idbSaved) {
+          try { localStorage.removeItem('fallback_' + key); } catch {}
+        }
+      }
     }
 
     /**
@@ -2862,11 +2868,6 @@
 
       if (window.visualViewport) {
         window.visualViewport.addEventListener('resize', () => {
-          const dock = document.querySelector('.bottom-dock');
-          if (dock) {
-            const offset = Math.max(0, window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop);
-            dock.style.bottom = offset + 'px';
-          }
           if (state.query.trim().length > 0) {
             ensureSearchResultsVisible();
           }
