@@ -128,26 +128,6 @@
       text-overflow: ellipsis;
     }
 
-    .offline-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      padding: 2px 8px;
-      border-radius: 999px;
-      font-size: 11px;
-      font-weight: 600;
-      background: var(--success-bg);
-      color: var(--success-text);
-      flex-shrink: 0;
-    }
-
-    .offline-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: currentColor;
-    }
-
     .header-actions {
       position: relative;
       display: flex;
@@ -875,10 +855,6 @@
     <div class="container header-inner">
       <div class="brand">
         <h1 class="brand-title">Телефонний довідник</h1>
-        <span class="offline-badge" title="Додаток і база працюють автономно без інтернету">
-          <span class="offline-dot"></span>
-          <span>Офлайн</span>
-        </span>
       </div>
 
       <div class="header-actions" id="header-menu-wrap">
@@ -963,7 +939,7 @@
           <div class="menu-divider"></div>
           <div class="menu-version">
             <span>Телефонний довідник</span>
-            <span>v1.6.3</span>
+            <span>v1.6.4</span>
           </div>
         </div>
       </div>
@@ -1105,7 +1081,7 @@
   <div id="toast" class="toast">Скопійовано</div>
 
   <script>
-    const APP_VERSION = '1.6.3';
+    const APP_VERSION = '1.6.4';
 
     /**
      * =========================================================================
@@ -1216,6 +1192,17 @@
         return files;
       },
 
+      getByTag(docOrEl, localName) {
+        if (!docOrEl) return [];
+        const direct = docOrEl.getElementsByTagName(localName);
+        if (direct && direct.length > 0) return direct;
+        if (docOrEl.getElementsByTagNameNS) {
+          const ns = docOrEl.getElementsByTagNameNS('*', localName);
+          if (ns && ns.length > 0) return ns;
+        }
+        return direct;
+      },
+
       decodeXml(uint8Arr) {
         if (!uint8Arr) return null;
         const xmlText = new TextDecoder('utf-8').decode(uint8Arr);
@@ -1259,11 +1246,11 @@
 
       parseSharedStrings(doc) {
         if (!doc) return [];
-        const siNodes = doc.getElementsByTagName('si');
+        const siNodes = this.getByTag(doc, 'si');
         const len = siNodes.length;
         const list = new Array(len);
         for (let i = 0; i < len; i++) {
-          const tNodes = siNodes[i].getElementsByTagName('t');
+          const tNodes = this.getByTag(siNodes[i], 't');
           if (tNodes.length === 1) {
             list[i] = tNodes[0].textContent || '';
           } else {
@@ -1282,17 +1269,17 @@
         if (!stylesDoc) return grayXfSet;
 
         const grayFillIds = new Set();
-        const fills = stylesDoc.getElementsByTagName('fill');
+        const fills = this.getByTag(stylesDoc, 'fill');
 
         for (let i = 0; i < fills.length; i++) {
-          const patternFill = fills[i].getElementsByTagName('patternFill')[0];
+          const patternFill = this.getByTag(fills[i], 'patternFill')[0];
           if (!patternFill) continue;
           const patternType = (patternFill.getAttribute('patternType') || '').toLowerCase();
           if (!patternType || patternType === 'none') continue;
           if (i === 1 && patternType === 'gray125') continue;
 
-          const fgColor = patternFill.getElementsByTagName('fgColor')[0];
-          const bgColor = patternFill.getElementsByTagName('bgColor')[0];
+          const fgColor = this.getByTag(patternFill, 'fgColor')[0];
+          const bgColor = this.getByTag(patternFill, 'bgColor')[0];
 
           const hasVisibleFillColor = (node) => {
             if (!node) return false;
@@ -1333,9 +1320,9 @@
 
         // Также учитываем cellStyleXfs (если заливка задана через именованный стиль ячейки)
         const styleXfsGray = new Set();
-        const cellStyleXfs = stylesDoc.getElementsByTagName('cellStyleXfs')[0];
+        const cellStyleXfs = this.getByTag(stylesDoc, 'cellStyleXfs')[0];
         if (cellStyleXfs) {
-          const sxfs = cellStyleXfs.getElementsByTagName('xf');
+          const sxfs = this.getByTag(cellStyleXfs, 'xf');
           for (let i = 0; i < sxfs.length; i++) {
             const fillId = parseInt(sxfs[i].getAttribute('fillId') || '-1', 10);
             if (grayFillIds.has(fillId)) {
@@ -1344,9 +1331,9 @@
           }
         }
 
-        const cellXfs = stylesDoc.getElementsByTagName('cellXfs')[0];
+        const cellXfs = this.getByTag(stylesDoc, 'cellXfs')[0];
         if (cellXfs) {
-          const xfs = cellXfs.getElementsByTagName('xf');
+          const xfs = this.getByTag(cellXfs, 'xf');
           for (let i = 0; i < xfs.length; i++) {
             const fillId = parseInt(xfs[i].getAttribute('fillId') || '-1', 10);
             const xfId = parseInt(xfs[i].getAttribute('xfId') || '-1', 10);
@@ -1375,7 +1362,7 @@
 
         const relMap = new Map();
         if (relsDoc) {
-          const rels = relsDoc.getElementsByTagName('Relationship');
+          const rels = this.getByTag(relsDoc, 'Relationship');
           for (let i = 0; i < rels.length; i++) {
             const id = rels[i].getAttribute('Id');
             let target = rels[i].getAttribute('Target') || '';
@@ -1385,7 +1372,7 @@
           }
         }
 
-        const sheetNodes = wbDoc.getElementsByTagName('sheet');
+        const sheetNodes = this.getByTag(wbDoc, 'sheet');
         const sheets = [];
 
         for (let i = 0; i < sheetNodes.length; i++) {
@@ -1397,14 +1384,14 @@
           if (!sheetDoc) continue;
 
           const merges = [];
-          const mergeNodes = sheetDoc.getElementsByTagName('mergeCell');
+          const mergeNodes = this.getByTag(sheetDoc, 'mergeCell');
           for (let m = 0; m < mergeNodes.length; m++) {
             const ref = mergeNodes[m].getAttribute('ref');
             if (ref) merges.push(this.parseRangeRef(ref));
           }
 
           const rowsMap = new Map();
-          const rowNodes = sheetDoc.getElementsByTagName('row');
+          const rowNodes = this.getByTag(sheetDoc, 'row');
           let maxRow = 0;
 
           for (let rIdx = 0; rIdx < rowNodes.length; rIdx++) {
@@ -1413,7 +1400,7 @@
             const currentRow = rAttr ? (parseInt(rAttr, 10) - 1) : rIdx;
             if (currentRow > maxRow) maxRow = currentRow;
 
-            const cNodes = rowNode.getElementsByTagName('c');
+            const cNodes = this.getByTag(rowNode, 'c');
             if (cNodes.length === 0) continue;
 
             let rowCells = rowsMap.get(currentRow);
@@ -1441,18 +1428,18 @@
 
               let val = '';
               if (t === 's') {
-                const vNode = cNode.getElementsByTagName('v')[0];
+                const vNode = this.getByTag(cNode, 'v')[0];
                 if (vNode) {
                   const idx = parseInt(vNode.textContent || '0', 10);
                   val = sharedStrings[idx] !== undefined ? sharedStrings[idx] : '';
                 }
               } else if (t === 'inlineStr') {
-                const tNodes = cNode.getElementsByTagName('t');
+                const tNodes = this.getByTag(cNode, 't');
                 for (let j = 0; j < tNodes.length; j++) {
                   val += tNodes[j].textContent || '';
                 }
               } else {
-                const vNode = cNode.getElementsByTagName('v')[0];
+                const vNode = this.getByTag(cNode, 'v')[0];
                 if (vNode && vNode.textContent !== null) {
                   val = vNode.textContent;
                   if (/^-?\d+\.0+$/.test(val)) {
@@ -1520,14 +1507,14 @@
     function applyMergeInheritance(rowsMap, merges, targetCols) {
       for (let i = 0; i < merges.length; i++) {
         const m = merges[i];
-        // Пропускаємо горизонтальні заголовки підрозділів/відділів на всю ширину A:C / A:D
+        // Пропускаємо суто горизонтальні заголовки на всю ширину A:C / A:D
         if (m.s.r === m.e.r && m.s.c === 0 && m.e.c >= 2) continue;
         if (m.e.r <= m.s.r) continue;
 
         for (let col = m.s.c; col <= m.e.c; col++) {
           if (!targetCols.includes(col)) continue;
 
-          // Шукаємо непорожнє значення в об'єднаному діапазоні (зазвичай у верхній комірці m.s.r)
+          // Шукаємо непорожнє значення в об'єднаному діапазоні (верхня комірка m.s.r)
           let sourceCell = null;
           for (let sr = m.s.r; sr <= m.e.r; sr++) {
             const candidate = rowsMap.get(sr)?.get(col);
@@ -1554,25 +1541,30 @@
       }
     }
 
-    function rowHasGrayFill(rowCells) {
-      for (let c = 0; c <= 3; c++) {
-        if (rowCells.get(c)?.isGray) return true;
-      }
-      return false;
+    /**
+     * Сіра заливка підрозділу: перевіряємо комірку A (або B, якщо A не має стилю),
+     * але НЕ колонки C/D (щоб успадкований стиль з верхньої комірки телефону/кабінету
+     * не позначав звичайного співробітника як сірий підрозділ).
+     */
+    function isSubdivisionGrayRow(rowCells) {
+      return Boolean(rowCells.get(0)?.isGray || rowCells.get(1)?.isGray);
     }
 
     function parseMainSheetData(sheet) {
       if (!sheet) return [];
       const { rowsMap, merges, maxRow } = sheet;
 
-      // Колонки C (index 2 — телефон) і D (index 3 — кабінет) успадковують значення з верхньої комірки об'єднання
+      // Колонки C (2 — телефон) і D (3 — кабінет) успадковують значення з верхньої комірки об'єднання
       applyMergeInheritance(rowsMap, merges, [2, 3]);
 
-      const horizMergeByRow = new Map();
+      // Словник горизонтальних об'єднань A:C / A:D (покриває і однорядкові, і багаторядкові об'єднання A:D)
+      const fullWidthMergeByRow = new Map();
       for (let i = 0; i < merges.length; i++) {
         const m = merges[i];
-        if (m.s.r === m.e.r && m.s.c === 0 && m.e.c >= 2) {
-          horizMergeByRow.set(m.s.r, m);
+        if (m.s.c === 0 && m.e.c >= 2) {
+          for (let r = m.s.r; r <= m.e.r; r++) {
+            fullWidthMergeByRow.set(r, m);
+          }
         }
       }
 
@@ -1594,23 +1586,29 @@
         if (!valA && !valB && !valC && !valD) continue;
         if (isHeaderRow(valA, valB, valC)) continue;
 
-        const hMerge = horizMergeByRow.get(r);
-        const isGray = rowHasGrayFill(rowCells);
+        const fullMerge = fullWidthMergeByRow.get(r);
+        const isGray = isSubdivisionGrayRow(rowCells);
 
-        // 1. Новий цех/підрозділ: сірий рядок (192,192,192), об'єднаний на всю ширину A:D (або A:C)
-        // 2. Підпідрозділ / відділ / лабораторія: об'єднаний на всю ширину A:D (або A:C), але без сірої заливки
-        //    (або рядок із самою лише назвою в A, якщо B, C, D порожні)
-        if ((hMerge && valA) || (!hMerge && valA && !valB && !valC && !valD)) {
-          const cleanTitle = valA.replace(/\s+/g, ' ').trim();
-          if (isGray) {
-            currentSubdivision = cleanTitle;
+        // 1. Новий цех/підрозділ: сірий рядок, об'єднаний на всю ширину A:D (або A:C)
+        if (fullMerge && isGray) {
+          if (r === fullMerge.s.r && valA) {
+            currentSubdivision = valA.replace(/\s+/g, ' ').trim();
             currentDepartment = '';
-          } else {
-            currentDepartment = cleanTitle;
           }
           continue;
         }
 
+        // 2. Підпідрозділ / відділ / лабораторія:
+        //    ТІЛЬКИ рядок, об'єднаний на всю ширину A:D (або A:C) без сірої заливки!
+        //    Необ'єднані рядки (як наприклад ЦЩРК-3,4 у клітинці A без об'єднання A:D) не стають папками.
+        if (fullMerge && !isGray) {
+          if (r === fullMerge.s.r && valA) {
+            currentDepartment = valA.replace(/\s+/g, ' ').trim();
+          }
+          continue;
+        }
+
+        // 3. Звичайний контакт / пост / приміщення
         if (valA || valB || valC || valD) {
           const baseKey = buildStableContactKey('main', [currentSubdivision, currentDepartment, valA, valB, valC, valD]);
           const seenCount = (dupCounter.get(baseKey) || 0) + 1;
@@ -1640,11 +1638,13 @@
 
       applyMergeInheritance(rowsMap, merges, [2]);
 
-      const horizMergeByRow = new Map();
+      const fullWidthMergeByRow = new Map();
       for (let i = 0; i < merges.length; i++) {
         const m = merges[i];
-        if (m.s.r === m.e.r && m.s.c === 0 && m.e.c >= 2) {
-          horizMergeByRow.set(m.s.r, m);
+        if (m.s.c === 0 && m.e.c >= 2) {
+          for (let r = m.s.r; r <= m.e.r; r++) {
+            fullWidthMergeByRow.set(r, m);
+          }
         }
       }
 
@@ -1665,16 +1665,20 @@
         if (!valA && !valB && !valC) continue;
         if (isHeaderRow(valA, valB, valC)) continue;
 
-        const hMerge = horizMergeByRow.get(r);
-        const isGray = rowHasGrayFill(rowCells);
+        const fullMerge = fullWidthMergeByRow.get(r);
+        const isGray = isSubdivisionGrayRow(rowCells);
 
-        if ((hMerge && valA) || (!hMerge && valA && !valB && !valC)) {
-          const cleanTitle = valA.replace(/\s+/g, ' ').trim();
-          if (isGray) {
-            currentOrg = cleanTitle;
+        if (fullMerge && isGray) {
+          if (r === fullMerge.s.r && valA) {
+            currentOrg = valA.replace(/\s+/g, ' ').trim();
             currentSubcat = '';
-          } else {
-            currentSubcat = cleanTitle;
+          }
+          continue;
+        }
+
+        if (fullMerge && !isGray) {
+          if (r === fullMerge.s.r && valA) {
+            currentSubcat = valA.replace(/\s+/g, ' ').trim();
           }
           continue;
         }
