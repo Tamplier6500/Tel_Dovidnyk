@@ -1,4 +1,4 @@
-const CACHE_NAME = 'raes-phonebook-v1.6.2';
+const CACHE_NAME = 'offline-phonebook-v1.6.3';
 const ASSETS = [
   './',
   './index.html',

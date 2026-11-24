@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Довідник" />
-  <meta name="description" content="Автономний офлайн телефонний довідник РАЕС та сторонніх організацій" />
+  <meta name="description" content="Автономний офлайн телефонний довідник" />
   <link rel="manifest" href="./manifest.json" />
   <link rel="icon" type="image/svg+xml" href="./icon.svg" />
   <link rel="apple-touch-icon" href="./icon.svg" />
@@ -963,7 +963,7 @@
           <div class="menu-divider"></div>
           <div class="menu-version">
             <span>Телефонний довідник</span>
-            <span>v1.6.2</span>
+            <span>v1.6.3</span>
           </div>
         </div>
       </div>
@@ -990,7 +990,7 @@
             id="search-input"
             class="search-input"
             autocomplete="off"
-            placeholder="Пошук: П.І.Б., телефон, посада, кабінет, цех..."
+            placeholder="Пошук у поточному розділі..."
           />
           <button
             id="search-clear-btn"
@@ -1009,12 +1009,12 @@
       </div>
 
       <nav class="nav-tabs" id="tabs-bar">
-        <button class="nav-tab active" data-tab="raes">
-          <span>РАЕС</span>
-          <span class="tab-badge" id="tab-count-raes"></span>
+        <button class="nav-tab active" data-tab="main">
+          <span id="tab-label-main">Основний</span>
+          <span class="tab-badge" id="tab-count-main"></span>
         </button>
         <button class="nav-tab" data-tab="external">
-          <span>Сторонні</span>
+          <span id="tab-label-ext">Додатковий</span>
           <span class="tab-badge" id="tab-count-ext"></span>
         </button>
         <button class="nav-tab" data-tab="favorites">
@@ -1067,7 +1067,7 @@
         <button class="modal-close" type="button" data-close-modal="confirm-clear-modal">×</button>
       </div>
       <p style="margin:0 0 16px; font-size:13px; color:var(--text-sec); line-height:1.45;">
-        Усі імпортовані контакти РАЕС та сторонніх організацій буде видалено з пристрою. Папки та контакти в «Обраному» залишаться збереженими.
+        Усі імпортовані контакти з усіх розділів довідника буде видалено з пристрою. Папки та контакти в «Обраному» залишаться збереженими.
       </p>
       <div style="display:flex; justify-content:flex-end; gap:8px;">
         <button type="button" data-close-modal="confirm-clear-modal" class="btn-ghost">Скасувати</button>
@@ -1105,7 +1105,7 @@
   <div id="toast" class="toast">Скопійовано</div>
 
   <script>
-    const APP_VERSION = '1.6.2';
+    const APP_VERSION = '1.6.3';
 
     /**
      * =========================================================================
@@ -1317,7 +1317,7 @@
             const theme = node.getAttribute('theme');
             if (theme !== null) {
               const tint = parseFloat(node.getAttribute('tint') || '0');
-              if (theme === '0' && tint === 0) return false;
+              if (theme === '0' && Math.abs(tint) < 0.02) return false;
               return true;
             }
             return false;
@@ -1331,12 +1331,27 @@
           }
         }
 
+        // Также учитываем cellStyleXfs (если заливка задана через именованный стиль ячейки)
+        const styleXfsGray = new Set();
+        const cellStyleXfs = stylesDoc.getElementsByTagName('cellStyleXfs')[0];
+        if (cellStyleXfs) {
+          const sxfs = cellStyleXfs.getElementsByTagName('xf');
+          for (let i = 0; i < sxfs.length; i++) {
+            const fillId = parseInt(sxfs[i].getAttribute('fillId') || '-1', 10);
+            if (grayFillIds.has(fillId)) {
+              styleXfsGray.add(i);
+            }
+          }
+        }
+
         const cellXfs = stylesDoc.getElementsByTagName('cellXfs')[0];
         if (cellXfs) {
           const xfs = cellXfs.getElementsByTagName('xf');
           for (let i = 0; i < xfs.length; i++) {
             const fillId = parseInt(xfs[i].getAttribute('fillId') || '-1', 10);
-            if (grayFillIds.has(fillId)) {
+            const xfId = parseInt(xfs[i].getAttribute('xfId') || '-1', 10);
+            const applyFill = xfs[i].getAttribute('applyFill');
+            if (grayFillIds.has(fillId) || (applyFill === '0' && styleXfsGray.has(xfId))) {
               grayXfSet.add(i);
             }
           }
@@ -1467,8 +1482,7 @@
 
     /**
      * =========================================================================
-     * 2. ПАРСИНГ АРКУШІВ «РАЕС» ТА «СТОРОННІ ОРГАНІЗАЦІЇ»
-     *    З ПІДТРИМКОЮ ОБ'ЄДНАНИХ НОМЕРІВ ТЕЛЕФОНІВ (C26:C28) ТА ПРИМІЩЕНЬ (D12:D13)
+     * 2. ПАРСИНГ АРКУШІВ EXCEL ТА УСПАДКУВАННЯ ОБ'ЄДНАНИХ КОМІРОК
      * =========================================================================
      */
     function normalizePhone(val) {
@@ -1501,19 +1515,19 @@
 
     /**
      * Успадкування значень для вертикально та прямокутно об'єднаних комірок
-     * (наприклад C26:C28 спільний телефон, D12:D13 або D26:D28 спільне приміщення).
+     * (спільний номер телефону в C або приміщення в D для групи співробітників).
      */
     function applyMergeInheritance(rowsMap, merges, targetCols) {
       for (let i = 0; i < merges.length; i++) {
         const m = merges[i];
-        // Пропускаємо горизонтальні заголовки підрозділів/відділів A:C / A:D
+        // Пропускаємо горизонтальні заголовки підрозділів/відділів на всю ширину A:C / A:D
         if (m.s.r === m.e.r && m.s.c === 0 && m.e.c >= 2) continue;
         if (m.e.r <= m.s.r) continue;
 
         for (let col = m.s.c; col <= m.e.c; col++) {
           if (!targetCols.includes(col)) continue;
 
-          // Шукаємо перше непорожнє значення в межах об'єднаного блоку
+          // Шукаємо непорожнє значення в об'єднаному діапазоні (зазвичай у верхній комірці m.s.r)
           let sourceCell = null;
           for (let sr = m.s.r; sr <= m.e.r; sr++) {
             const candidate = rowsMap.get(sr)?.get(col);
@@ -1547,11 +1561,11 @@
       return false;
     }
 
-    function parseRaesSheetData(sheet) {
+    function parseMainSheetData(sheet) {
       if (!sheet) return [];
       const { rowsMap, merges, maxRow } = sheet;
 
-      // Колонки C (index 2 — телефон) і D (index 3 — кабінет) успадковують значення об'єднаних комірок
+      // Колонки C (index 2 — телефон) і D (index 3 — кабінет) успадковують значення з верхньої комірки об'єднання
       applyMergeInheritance(rowsMap, merges, [2, 3]);
 
       const horizMergeByRow = new Map();
@@ -1562,8 +1576,9 @@
         }
       }
 
+      const defaultSubdivision = sheet.name ? sheet.name.trim() : 'Основний розділ';
       const contacts = [];
-      let currentSubdivision = 'Загальні підрозділи РАЕС';
+      let currentSubdivision = defaultSubdivision;
       let currentDepartment = '';
       const dupCounter = new Map();
 
@@ -1582,9 +1597,10 @@
         const hMerge = horizMergeByRow.get(r);
         const isGray = rowHasGrayFill(rowCells);
 
-        // Заголовок підрозділу або відділу визначається ТІЛЬКИ горизонтальним об'єднанням A:C / A:D
-        // (якщо комірки не об'єднані по горизонталі, рядок із самою лише посадою в A без П.І.Б. у B — це запис контакту!)
-        if (hMerge && valA) {
+        // 1. Новий цех/підрозділ: сірий рядок (192,192,192), об'єднаний на всю ширину A:D (або A:C)
+        // 2. Підпідрозділ / відділ / лабораторія: об'єднаний на всю ширину A:D (або A:C), але без сірої заливки
+        //    (або рядок із самою лише назвою в A, якщо B, C, D порожні)
+        if ((hMerge && valA) || (!hMerge && valA && !valB && !valC && !valD)) {
           const cleanTitle = valA.replace(/\s+/g, ' ').trim();
           if (isGray) {
             currentSubdivision = cleanTitle;
@@ -1596,14 +1612,14 @@
         }
 
         if (valA || valB || valC || valD) {
-          const baseKey = buildStableContactKey('raes', [currentSubdivision, currentDepartment, valA, valB, valC, valD]);
+          const baseKey = buildStableContactKey('main', [currentSubdivision, currentDepartment, valA, valB, valC, valD]);
           const seenCount = (dupCounter.get(baseKey) || 0) + 1;
           dupCounter.set(baseKey, seenCount);
           const id = seenCount > 1 ? `${baseKey}_${seenCount}` : baseKey;
 
           contacts.push({
             id,
-            source: 'raes',
+            source: 'main',
             subdivision: currentSubdivision,
             department: currentDepartment,
             position: valA,
@@ -1632,8 +1648,9 @@
         }
       }
 
+      const defaultOrg = sheet.name ? sheet.name.trim() : 'Додатковий розділ';
       const contacts = [];
-      let currentOrg = 'Сторонні організації';
+      let currentOrg = defaultOrg;
       let currentSubcat = '';
       const dupCounter = new Map();
 
@@ -1651,7 +1668,7 @@
         const hMerge = horizMergeByRow.get(r);
         const isGray = rowHasGrayFill(rowCells);
 
-        if (hMerge && valA) {
+        if ((hMerge && valA) || (!hMerge && valA && !valB && !valC)) {
           const cleanTitle = valA.replace(/\s+/g, ' ').trim();
           if (isGray) {
             currentOrg = cleanTitle;
@@ -1694,7 +1711,7 @@
      * 3. INDEXEDDB + LOCALSTORAGE РЕЗЕРВНЕ ЗБЕРЕЖЕННЯ (100% ОФЛАЙН)
      * =========================================================================
      */
-    const DB_NAME = 'RaesPhonebookOfflineV4';
+    const DB_NAME = 'PhonebookOfflineDB_v5';
     const DB_VERSION = 1;
     const STORE_NAME = 'kv';
 
@@ -1765,14 +1782,16 @@
 
     const state = {
       db: {
-        raes: [],
-        external: []
+        main: [],
+        external: [],
+        mainTabName: 'Основний',
+        extTabName: 'Додатковий'
       },
       favData: {
         folders: [],
         items: []
       },
-      tab: 'raes',
+      tab: 'main',
       query: '',
       searchLimit: 120,
       nodeKeyToId: new Map(),
@@ -1798,8 +1817,8 @@
 
     function rebuildContactIndex() {
       const map = new Map();
-      for (let i = 0; i < state.db.raes.length; i++) {
-        map.set(state.db.raes[i].id, state.db.raes[i]);
+      for (let i = 0; i < state.db.main.length; i++) {
+        map.set(state.db.main[i].id, state.db.main[i]);
       }
       for (let i = 0; i < state.db.external.length; i++) {
         map.set(state.db.external[i].id, state.db.external[i]);
@@ -1808,7 +1827,7 @@
     }
 
     async function persistFavorites() {
-      await storageSet('fav_data_v4', state.favData);
+      await storageSet('fav_data_v5', state.favData);
     }
 
     function getFavEntry(contactId) {
@@ -1878,30 +1897,33 @@
         const buffer = await bufferPromise;
         const workbook = await OfflineXLSX.readWorkbook(buffer);
 
-        const raesSheet = workbook.sheets.find(s => s.name.trim().toUpperCase() === 'РАЕС')
-          || workbook.sheets.find(s => s.name.toLowerCase().includes('раес'))
-          || workbook.sheets[0];
-
-        let extSheet = workbook.sheets.find(s => {
-          const low = s.name.toLowerCase();
-          return low.includes('оронн') || low.includes('орган');
-        });
-        if (extSheet === raesSheet && workbook.sheets.length > 1) {
-          extSheet = workbook.sheets[1];
+        if (!workbook.sheets || workbook.sheets.length === 0) {
+          setLoading(false);
+          showToast('У файлі не знайдено аркушів');
+          return;
         }
 
-        const raesContacts = parseRaesSheetData(raesSheet);
+        // Беремо 1-й та 2-й аркуш книги Excel і використовуємо їхні реальні назви для вкладок
+        const mainSheet = workbook.sheets[0];
+        const extSheet = workbook.sheets.length > 1 ? workbook.sheets[1] : null;
+
+        const mainTabName = mainSheet?.name ? mainSheet.name.trim() : 'Основний';
+        const extTabName = extSheet?.name ? extSheet.name.trim() : 'Додатковий';
+
+        const mainContacts = parseMainSheetData(mainSheet);
         const extContacts = parseExternalSheetData(extSheet);
 
-        if (raesContacts.length === 0 && extContacts.length === 0) {
+        if (mainContacts.length === 0 && extContacts.length === 0) {
           setLoading(false);
           showToast('У файлі не знайдено контактів');
           return;
         }
 
         state.db = {
-          raes: raesContacts,
-          external: extContacts
+          main: mainContacts,
+          external: extContacts,
+          mainTabName,
+          extTabName
         };
         rebuildContactIndex();
 
@@ -1917,11 +1939,14 @@
         state.nodeIdToKey.clear();
         state.nodeIdCounter = 0;
 
-        await storageSet('phonebook_db_v4', state.db);
+        await storageSet('phonebook_db_v5', state.db);
         setLoading(false);
         render();
         scrollPageToTopImmediate();
-        showToast(`Імпортовано: РАЕС (${raesContacts.length}), Сторонні (${extContacts.length})`);
+        const summary = extSheet
+          ? `${mainTabName} (${mainContacts.length}), ${extTabName} (${extContacts.length})`
+          : `${mainTabName} (${mainContacts.length})`;
+        showToast(`Імпортовано: ${summary}`);
       } catch (err) {
         console.error(err);
         setLoading(false);
@@ -1934,7 +1959,7 @@
      */
     function exportBackup() {
       const payload = {
-        app: 'RaesPhonebookPWA',
+        app: 'OfflinePhonebookPWA',
         version: APP_VERSION,
         exportedAt: new Date().toISOString(),
         db: state.db,
@@ -1975,13 +2000,15 @@
           throw new Error('Невірний формат файлу резервної копії');
         }
 
-        if (parsed.db && (Array.isArray(parsed.db.raes) || Array.isArray(parsed.db.external))) {
+        if (parsed.db && (Array.isArray(parsed.db.main) || Array.isArray(parsed.db.external))) {
           state.db = {
-            raes: Array.isArray(parsed.db.raes) ? parsed.db.raes : [],
-            external: Array.isArray(parsed.db.external) ? parsed.db.external : []
+            main: Array.isArray(parsed.db.main) ? parsed.db.main : [],
+            external: Array.isArray(parsed.db.external) ? parsed.db.external : [],
+            mainTabName: parsed.db.mainTabName || 'Основний',
+            extTabName: parsed.db.extTabName || 'Додатковий'
           };
           rebuildContactIndex();
-          await storageSet('phonebook_db_v4', state.db);
+          await storageSet('phonebook_db_v5', state.db);
         }
 
         if (parsed.favData && Array.isArray(parsed.favData.items)) {
@@ -2000,7 +2027,7 @@
         setLoading(false);
         render();
         scrollPageToTopImmediate();
-        showToast(`Відновлено: РАЕС (${state.db.raes.length}), Сторонні (${state.db.external.length}), Обране (${state.favData.items.length})`);
+        showToast(`Відновлено: ${state.db.mainTabName} (${state.db.main.length}), ${state.db.extTabName} (${state.db.external.length}), Обране (${state.favData.items.length})`);
       } catch (err) {
         console.error(err);
         setLoading(false);
@@ -2009,7 +2036,7 @@
     }
 
     async function loadDemoData() {
-      const raesDemo = [
+      const mainDemo = [
         { subdivision: 'Бухгалтерія', department: '', position: 'Головний бухгалтер', name: 'Шепель Ольга Леонідівна', phone: '64111', room: 'ВЛК, прим. 334' },
         { subdivision: 'Бухгалтерія', department: 'Відділ обліку запасів та необоротних активів', position: 'Бухгалтер І категорії', name: 'Мельник Олена Василівна', phone: '64111', room: 'ВЛК, прим. 127' },
         { subdivision: 'Бухгалтерія', department: 'Відділ обліку запасів та необоротних активів', position: 'Бухгалтер ІІ категорії', name: 'Ковалець Наталія Вікторівна', phone: '64111', room: 'ВЛК, прим. 127' },
@@ -2018,8 +2045,8 @@
         { subdivision: 'Бухгалтерія', department: "Відділ обліку об'єктів соціальної інфраструктури", position: 'Бухгалтер', name: 'Демчук Оксана Сергіївна', phone: '64131', room: 'АПК-2, прим. 205' }
       ].map((r, idx) => ({
         ...r,
-        id: buildStableContactKey('raes', [r.subdivision, r.department, r.position, r.name, r.phone, idx]),
-        source: 'raes',
+        id: buildStableContactKey('main', [r.subdivision, r.department, r.position, r.name, r.phone, idx]),
+        source: 'main',
         phoneClean: normalizePhone(r.phone)
       }));
 
@@ -2033,21 +2060,31 @@
         phoneClean: normalizePhone(e.phone)
       }));
 
-      state.db = { raes: raesDemo, external: extDemo };
+      state.db = {
+        main: mainDemo,
+        external: extDemo,
+        mainTabName: 'Підрозділи',
+        extTabName: 'Сторонні організації'
+      };
       rebuildContactIndex();
-      await storageSet('phonebook_db_v4', state.db);
+      await storageSet('phonebook_db_v5', state.db);
       render();
       showToast('Тестові дані завантажено');
     }
 
     async function clearDatabase() {
-      state.db = { raes: [], external: [] };
+      state.db = {
+        main: [],
+        external: [],
+        mainTabName: 'Основний',
+        extTabName: 'Додатковий'
+      };
       rebuildContactIndex();
       state.expandedNodes.clear();
       state.nodeKeyToId.clear();
       state.nodeIdToKey.clear();
       state.nodeIdCounter = 0;
-      await storageSet('phonebook_db_v4', state.db);
+      await storageSet('phonebook_db_v5', state.db);
       closeModal('confirm-clear-modal');
       render();
       showToast('Базу даних очищено');
@@ -2085,7 +2122,7 @@
       const currentFolderId = existing ? (existing.folderId || '') : null;
 
       document.getElementById('assign-modal-title').textContent = existing ? 'Папка в Обраному' : 'Додати в Обране';
-      const displayName = contact.source === 'raes' ? (contact.name || contact.position) : contact.title;
+      const displayName = contact.source === 'main' ? (contact.name || contact.position) : contact.title;
       document.getElementById('assign-contact-preview').textContent = `${displayName}${contact.phone ? ' • ' + contact.phone : ''}`;
 
       const listEl = document.getElementById('assign-folder-list');
@@ -2351,15 +2388,15 @@
       const firstPhone = (item.phone || '').split(/[,;]/)[0].trim();
       const telUri = firstPhone ? `tel:${firstPhone.replace(/[^\d+]/g, '')}` : '';
 
-      const pathParts = item.source === 'raes'
+      const pathParts = item.source === 'main'
         ? [item.subdivision, item.department].filter(Boolean)
         : [item.org, item.subcat].filter(Boolean);
 
-      const primaryTitle = item.source === 'raes'
+      const primaryTitle = item.source === 'main'
         ? (item.name || item.position || '—')
         : (item.title || '—');
 
-      const secondarySubtitle = item.source === 'raes'
+      const secondarySubtitle = item.source === 'main'
         ? (item.name && item.position ? item.position : '')
         : (item.details || '');
 
@@ -2454,8 +2491,11 @@
     }
 
     /**
-     * Дворівневе дерево: якщо в підрозділі є відділи, співробітники основного розділу
-     * автоматично переносяться в підпапку «Загальний».
+     * Дворівневе дерево:
+     * 1-й рівень — Підрозділ / цех (сірий рядок A:D у Excel)
+     * 2-й рівень — Підпідрозділ / відділ / лабораторія (білий рядок A:D у Excel)
+     * Якщо в підрозділі є підпідрозділи, співробітники безпосередньо під заголовком підрозділу
+     * групуються в підпапку «Загальний».
      */
     function buildTwoLevelGroups(items, scopePrefix, level1Key, level2Key) {
       const tree = new Map();
@@ -2656,6 +2696,9 @@
       return `${toolbarHtml}<div class="tree-stack">${foldersHtml}</div>`;
     }
 
+    /**
+     * Роздільний пошук строго у межах активної вкладки
+     */
     function renderSearchResults() {
       const qRaw = state.query.trim();
       const qLow = qRaw.toLowerCase();
@@ -2663,37 +2706,64 @@
       const hasDigits = qDigits.length >= 2 && /\d/.test(qDigits);
 
       const matches = [];
+      let scopeTitle = '';
 
-      for (let i = 0; i < state.db.raes.length; i++) {
-        const item = state.db.raes[i];
-        const hitText =
-          (item.name && item.name.toLowerCase().includes(qLow)) ||
-          (item.position && item.position.toLowerCase().includes(qLow)) ||
-          (item.phone && item.phone.toLowerCase().includes(qLow)) ||
-          (item.room && item.room.toLowerCase().includes(qLow)) ||
-          (item.subdivision && item.subdivision.toLowerCase().includes(qLow)) ||
-          (item.department && item.department.toLowerCase().includes(qLow));
-        const hitPhone = hasDigits && item.phoneClean && item.phoneClean.includes(qDigits);
-        if (hitText || hitPhone) matches.push(item);
-      }
+      if (state.tab === 'external') {
+        scopeTitle = state.db.extTabName || 'Додатковий';
+        for (let i = 0; i < state.db.external.length; i++) {
+          const item = state.db.external[i];
+          const hitText =
+            (item.title && item.title.toLowerCase().includes(qLow)) ||
+            (item.details && item.details.toLowerCase().includes(qLow)) ||
+            (item.phone && item.phone.toLowerCase().includes(qLow)) ||
+            (item.org && item.org.toLowerCase().includes(qLow)) ||
+            (item.subcat && item.subcat.toLowerCase().includes(qLow));
+          const hitPhone = hasDigits && item.phoneClean && item.phoneClean.includes(qDigits);
+          if (hitText || hitPhone) matches.push(item);
+        }
+      } else if (state.tab === 'favorites') {
+        scopeTitle = 'Обране';
+        const favContacts = state.favData.items
+          .map(entry => state.contactsById.get(entry.contactId) || entry.snapshot)
+          .filter(Boolean);
 
-      for (let i = 0; i < state.db.external.length; i++) {
-        const item = state.db.external[i];
-        const hitText =
-          (item.title && item.title.toLowerCase().includes(qLow)) ||
-          (item.details && item.details.toLowerCase().includes(qLow)) ||
-          (item.phone && item.phone.toLowerCase().includes(qLow)) ||
-          (item.org && item.org.toLowerCase().includes(qLow)) ||
-          (item.subcat && item.subcat.toLowerCase().includes(qLow));
-        const hitPhone = hasDigits && item.phoneClean && item.phoneClean.includes(qDigits);
-        if (hitText || hitPhone) matches.push(item);
+        for (let i = 0; i < favContacts.length; i++) {
+          const item = favContacts[i];
+          const hitText =
+            (item.name && item.name.toLowerCase().includes(qLow)) ||
+            (item.position && item.position.toLowerCase().includes(qLow)) ||
+            (item.title && item.title.toLowerCase().includes(qLow)) ||
+            (item.details && item.details.toLowerCase().includes(qLow)) ||
+            (item.phone && item.phone.toLowerCase().includes(qLow)) ||
+            (item.room && item.room.toLowerCase().includes(qLow)) ||
+            (item.subdivision && item.subdivision.toLowerCase().includes(qLow)) ||
+            (item.department && item.department.toLowerCase().includes(qLow)) ||
+            (item.org && item.org.toLowerCase().includes(qLow)) ||
+            (item.subcat && item.subcat.toLowerCase().includes(qLow));
+          const hitPhone = hasDigits && item.phoneClean && item.phoneClean.includes(qDigits);
+          if (hitText || hitPhone) matches.push(item);
+        }
+      } else {
+        scopeTitle = state.db.mainTabName || 'Основний';
+        for (let i = 0; i < state.db.main.length; i++) {
+          const item = state.db.main[i];
+          const hitText =
+            (item.name && item.name.toLowerCase().includes(qLow)) ||
+            (item.position && item.position.toLowerCase().includes(qLow)) ||
+            (item.phone && item.phone.toLowerCase().includes(qLow)) ||
+            (item.room && item.room.toLowerCase().includes(qLow)) ||
+            (item.subdivision && item.subdivision.toLowerCase().includes(qLow)) ||
+            (item.department && item.department.toLowerCase().includes(qLow));
+          const hitPhone = hasDigits && item.phoneClean && item.phoneClean.includes(qDigits);
+          if (hitText || hitPhone) matches.push(item);
+        }
       }
 
       if (matches.length === 0) {
         return `
           <div class="empty-card">
             <h3 class="empty-title">Нічого не знайдено</h3>
-            <p class="empty-desc" style="margin:0;">За запитом «${esc(qRaw)}» збігів немає.</p>
+            <p class="empty-desc" style="margin:0;">У розділі «${esc(scopeTitle)}» за запитом «${esc(qRaw)}» збігів немає.</p>
           </div>
         `;
       }
@@ -2703,7 +2773,7 @@
 
       return `
         <div class="toolbar-row">
-          <span class="meta-pill">Результати пошуку: ${matches.length}</span>
+          <span class="meta-pill">${esc(scopeTitle)} — знайдено: ${matches.length}</span>
         </div>
         <div class="folder-card">
           ${visible.map(c => renderContactRow(c, { query: qRaw, showPath: true })).join('')}
@@ -2718,12 +2788,31 @@
       `;
     }
 
-    function render() {
-      const hasData = state.db.raes.length > 0 || state.db.external.length > 0;
+    function updateSearchPlaceholder() {
+      const searchInput = document.getElementById('search-input');
+      if (!searchInput) return;
+      if (state.tab === 'external') {
+        const label = state.db.extTabName || 'Додатковий';
+        searchInput.placeholder = `Пошук у «${label}»: назва, П.І.Б., телефон...`;
+      } else if (state.tab === 'favorites') {
+        searchInput.placeholder = 'Пошук в «Обраному»...';
+      } else {
+        const label = state.db.mainTabName || 'Основний';
+        searchInput.placeholder = `Пошук у «${label}»: П.І.Б., телефон, посада, кабінет...`;
+      }
+    }
 
-      document.getElementById('tab-count-raes').textContent = state.db.raes.length ? `(${state.db.raes.length})` : '';
+    function render() {
+      const hasData = state.db.main.length > 0 || state.db.external.length > 0;
+
+      document.getElementById('tab-label-main').textContent = state.db.mainTabName || 'Основний';
+      document.getElementById('tab-label-ext').textContent = state.db.extTabName || 'Додатковий';
+
+      document.getElementById('tab-count-main').textContent = state.db.main.length ? `(${state.db.main.length})` : '';
       document.getElementById('tab-count-ext').textContent = state.db.external.length ? `(${state.db.external.length})` : '';
       document.getElementById('tab-count-fav').textContent = state.favData.items.length ? `(${state.favData.items.length})` : '';
+
+      updateSearchPlaceholder();
 
       const container = document.getElementById('app-content');
 
@@ -2740,13 +2829,13 @@
         return;
       }
 
-      if (state.tab === 'raes') {
+      if (state.tab === 'main') {
         container.innerHTML = renderTwoLevelTree({
-          items: state.db.raes,
-          scopePrefix: 'raes',
+          items: state.db.main,
+          scopePrefix: 'main',
           level1Key: 'subdivision',
           level2Key: 'department',
-          emptyText: 'На аркуші «РАЕС» записів не знайдено.'
+          emptyText: `На аркуші «${esc(state.db.mainTabName || 'Основний')}» записів не знайдено.`
         });
       } else if (state.tab === 'external') {
         container.innerHTML = renderTwoLevelTree({
@@ -2754,7 +2843,7 @@
           scopePrefix: 'ext',
           level1Key: 'org',
           level2Key: 'subcat',
-          emptyText: 'На аркуші «Сторонні організації» записів не знайдено.'
+          emptyText: `На аркуші «${esc(state.db.extTabName || 'Додатковий')}» записів не знайдено.`
         });
       } else {
         container.innerHTML = renderFavoritesTab();
@@ -2801,7 +2890,7 @@
         return;
       }
 
-      const prefix = state.tab === 'raes' ? 'raes::L1::' : 'ext::L1::';
+      const prefix = state.tab === 'main' ? 'main::L1::' : 'ext::L1::';
       const l1Ids = [];
       for (const [rawKey, id] of state.nodeKeyToId.entries()) {
         if (rawKey.startsWith(prefix)) l1Ids.push(id);
@@ -2809,13 +2898,13 @@
 
       const anyOpen = Array.from(state.expandedNodes).some(id => {
         const raw = state.nodeIdToKey.get(id) || '';
-        return raw.startsWith(state.tab === 'raes' ? 'raes::' : 'ext::');
+        return raw.startsWith(state.tab === 'main' ? 'main::' : 'ext::');
       });
 
       if (anyOpen) {
         for (const id of Array.from(state.expandedNodes)) {
           const raw = state.nodeIdToKey.get(id) || '';
-          if (raw.startsWith(state.tab === 'raes' ? 'raes::' : 'ext::')) {
+          if (raw.startsWith(state.tab === 'main' ? 'main::' : 'ext::')) {
             state.expandedNodes.delete(id);
           }
         }
@@ -2845,7 +2934,7 @@
 
     function toggleTheme() {
       const isDark = document.documentElement.classList.toggle('dark');
-      localStorage.setItem('raes_theme_v4', isDark ? 'dark' : 'light');
+      localStorage.setItem('phonebook_theme_v5', isDark ? 'dark' : 'light');
     }
 
     /**
@@ -2885,23 +2974,25 @@
      * =========================================================================
      */
     window.addEventListener('DOMContentLoaded', async () => {
-      const savedTheme = localStorage.getItem('raes_theme_v4');
+      const savedTheme = localStorage.getItem('phonebook_theme_v5') || localStorage.getItem('raes_theme_v4');
       if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
         document.documentElement.classList.add('dark');
       }
 
       setupPWA();
 
-      const savedDb = await storageGet('phonebook_db_v4');
-      if (savedDb && (Array.isArray(savedDb.raes) || Array.isArray(savedDb.external))) {
+      const savedDb = await storageGet('phonebook_db_v5');
+      if (savedDb && (Array.isArray(savedDb.main) || Array.isArray(savedDb.external))) {
         state.db = {
-          raes: savedDb.raes || [],
-          external: savedDb.external || []
+          main: savedDb.main || [],
+          external: savedDb.external || [],
+          mainTabName: savedDb.mainTabName || 'Основний',
+          extTabName: savedDb.extTabName || 'Додатковий'
         };
         rebuildContactIndex();
       }
 
-      const savedFavs = await storageGet('fav_data_v4');
+      const savedFavs = await storageGet('fav_data_v5') || await storageGet('fav_data_v4');
       if (savedFavs && Array.isArray(savedFavs.items)) {
         state.favData = {
           folders: Array.isArray(savedFavs.folders) ? savedFavs.folders : [],
